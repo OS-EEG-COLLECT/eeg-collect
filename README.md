@@ -49,15 +49,14 @@
 
 
 
+<br />
 
-  
 
 <!-- About the Project -->
 ## :information_source: About the Project
 
 
 <!-- Screenshots -->
-### :camera: Screenshots
 
 <div align="center"> 
   <img src="https://placehold.co/600x400?text=Your+Screenshot+here" alt="screenshot" />
@@ -89,6 +88,7 @@ the platform is well-suited for large-scale and field studies, offering automate
 
 
 
+<br />
 
 <!-- Getting Started -->
 ## 	:hammer: Getting Started
@@ -142,6 +142,8 @@ Remember to ensure that you start the backend server on the specified port.
   export const URLs = { WEB_SOCKET_URL: "ws://localhost:3000/websocket/" };
 ```
 
+<br />
+
 <!-- Usage -->
 ## :headphones: Usage
 
@@ -188,14 +190,14 @@ http://localhost:8080/setup-device?aHCWFRZvlU=[access_key]&AbXHPCkszw=[your_sess
   This parameter specifies the EEG headset configuration. Use any uppercase letter from `A` to `I`. Each letter corresponds to a different electrode placement setup.
 
 
-
+<br />
 
 <!-- Deployment -->
 ## :cloud: Deployment
 
 To deploy this project run
 
-
+<br />
 <!-- Contributing -->
 ## :busts_in_silhouette: Contributing
 
@@ -207,11 +209,13 @@ Contributions are always welcome! Please get in touch with us via email or open 
   <img src="https://contrib.rocks/image?repo=OS-EEG-COLLECT/eeg-collect" />
 </a>
 
+<br />
 <!-- License -->
 ## :scroll: License
 
 Distributed under the AGPL-3.0 License. See [LICENSE.txt](https://github.com/OS-EEG-COLLECT/eeg-collect/blob/master/LICENSE) for more information.
 
+<br />
 
 <!-- Contact -->
 ## :speech_balloon: Contact
