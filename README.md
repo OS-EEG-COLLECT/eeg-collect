@@ -94,7 +94,7 @@ the platform is well-suited for large-scale and field studies, offering automate
 <!-- Installation -->
 ### 1. Clone Repository
 
-Install my-project with npm
+Clone the repository to your local machine using the following commands:
 
 ```bash
   git clone https://github.com/OS-EEG-COLLECT/eeg-collect.git
