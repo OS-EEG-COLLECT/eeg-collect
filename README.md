@@ -233,7 +233,7 @@ On the server, pull the current main branch of this repository into your local c
 <!-- Contributing -->
 ## :busts_in_silhouette: Contributing
 
-Contributions are always welcome! Please get in touch with us via email or open an issue or pull request on GitHub.
+Contributions are always welcome! Please get in touch with us via email or open an [issue](https://github.com/OS-EEG-COLLECT/eeg-collect/issues/) or [pull request](https://github.com/OS-EEG-COLLECT/eeg-collect/pulls/) on GitHub.
 
 ### Contributors
 
