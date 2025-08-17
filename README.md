@@ -70,14 +70,14 @@ Designed for cross-platform compatibility and efficient session management,
 the platform is well-suited for large-scale and field studies, offering automated data management and real-time feedback to enhance data quality and reliability.
 
 <!-- Features -->
-### :dart: Features
+### Features
 
 - Feature 1
 - Feature 2
 - Feature 3
 
 <!-- Color Reference -->
-### :art: Color Reference
+### Color Reference
 
 | Color             | Hex                                                                |
 | ----------------- | ------------------------------------------------------------------ |
