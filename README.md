@@ -71,24 +71,15 @@ while the backend — built with Apache, Node.js, and Flask — handles efficien
 Designed for cross-platform compatibility and efficient session management,
 the platform is well-suited for large-scale and field studies, offering automated data management and real-time feedback to enhance data quality and reliability.
 
-<!-- Features -->
-### Features
+<!-- Key Features -->
+### Key Features
 
-- Feature 1
-- Feature 2
-- Feature 3
-
-<!-- Color Reference -->
-### Color Reference
-
-| Color             | Hex                                                                |
-| ----------------- | ------------------------------------------------------------------ |
-| Primary Color | ![#222831](https://via.placeholder.com/10/222831?text=+) #222831 |
-| Secondary Color | ![#393E46](https://via.placeholder.com/10/393E46?text=+) #393E46 |
-| Accent Color | ![#00ADB5](https://via.placeholder.com/10/00ADB5?text=+) #00ADB5 |
-| Text Color | ![#EEEEEE](https://via.placeholder.com/10/EEEEEE?text=+) #EEEEEE |
-
-
+| Feature                                      | Description                                                                                                                                                                                                                                                                                                                                                 |
+|-----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Accessible GUI for EEG data collection        | User-friendly interface guides users through headset setup, ensures good signal quality, and automates data processing and saving, enabling high-quality data collection in the field.                                                                                                                               |
+| Real-time impedance checks for electrode stability | Provides real-time, color-coded impedance feedback to help users ensure electrodes are properly connected and stable, making it easy to identify and resolve connection issues—even in field studies.                                                                           |
+| Customizable electrode configurations         | Supports a range of predefined or custom electrode configurations, allowing researchers to adapt the setup to their specific needs and ensuring flexibility in data collection.                                                                                                |
+| Efficient data transmission and storage       | Utilizes Node.js and Flask for efficient data transmission and storage via WebSocket, enabling low-latency, high-throughput data handling and easy access for further analysis.                                                                                                |
 
 <br />
 
