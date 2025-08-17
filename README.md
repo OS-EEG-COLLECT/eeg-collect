@@ -123,19 +123,22 @@ Install my-project with npm
 
 During data recording, the frontend service continuously streams signal data to the backend server.
 To ensure that the frontend can communicate with the backend, you need to adjust the backend server URL in the frontend module.
-<br /> To do so, open the `frontend/src/utils/helpers.ts` file, and set the `WEB_SOCKET_URL` property of the `URLs` object to your server.
-E.g.:
-```typescript
-  export const URLs = { WEB_SOCKET_URL: "wss://exg.iism.kit.edu/websocket/" };
-```
+<br /> To do so, open the `frontend/src/utils/helpers.ts` file, and set the `WEB_SOCKET_URL` property of the `URLs` object to your server:
 
-For development purposes, you can use the following URL.
-```typescript
-  export const URLs = { WEB_SOCKET_URL: "ws://localhost:3000/websocket/" };
-```
+**A. If you have [deployed your own server](#cloud-deployment):**
 
-The default port is `3000`, but you can change it to your desired port.
+- The `WEB_SOCKET_URL` should point to your backend server's WebSocket URL. For example:
+
+    ```typescript
+    export const URLs = { WEB_SOCKET_URL: "wss://exg.iism.kit.edu/websocket/" };
+    ```
+**B. For local development**
+- For development purposes, the server is run locally. The default port is `3000`, but you can change it to your desired port.
 Remember to ensure that you start the backend server on the specified port.
+    ```typescript
+    export const URLs = { WEB_SOCKET_URL: "ws://localhost:3000/websocket/" };
+    ```
+
 
 <br />
 
