@@ -192,6 +192,7 @@ http://localhost:8080/setup-device?aHCWFRZvlU=[access_key]&AbXHPCkszw=[your_sess
 To deploy this project run
 
 <br />
+
 <!-- Contributing -->
 ## :busts_in_silhouette: Contributing
 
@@ -204,6 +205,7 @@ Contributions are always welcome! Please get in touch with us via email or open 
 </a>
 
 <br />
+
 <!-- License -->
 ## :scroll: License
 
