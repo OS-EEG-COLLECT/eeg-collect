@@ -136,11 +136,13 @@ E.g.:
   export const URLs = { WEB_SOCKET_URL: "wss://exg.iism.kit.edu/websocket/" };
 ```
 
-For development purposes, you can use the following URL. The default port is `3000`, but you can change it to your desired port.
-Remember to ensure that you start the backend server on the specified port.
+For development purposes, you can use the following URL.
 ```typescript
   export const URLs = { WEB_SOCKET_URL: "ws://localhost:3000/websocket/" };
 ```
+
+The default port is `3000`, but you can change it to your desired port.
+Remember to ensure that you start the backend server on the specified port.
 
 <br />
 
