@@ -62,6 +62,8 @@
   <img src="https://placehold.co/600x400?text=Your+Screenshot+here" alt="screenshot" />
 </div>
 
+<br />
+
 Weelenkern STREAMS provides a customizable, user-friendly platform for EEG data collection using OpenBCI hardware.
 It streamlines the setup process and supports versatile electrode configurations, making EEG-based BCI research more accessible.
 The Vue 3 and D3.js frontend offers real-time impedance checks helping the user establish a stable connection with Wellenkern BURSTS,
