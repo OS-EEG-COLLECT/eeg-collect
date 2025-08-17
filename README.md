@@ -104,19 +104,15 @@ Install my-project with npm
 <!-- Install Dependencies -->
 ### 2. Install Dependencies
 
-1. To install the frontend dependencies, navigate to the `frontend/` directory and run:
-  ```bash
-    npm install
-  ```
+1. To install the frontend and backend dependencies, navigate to the `frontend/` and `backend/` directories respectively and run:
+      ```bash
+        npm install
+      ```
 
-2. Next, install the backend dependencies by navigating to the `backend/` directory and running the same command:
-  ```bash
-    npm install
-  ```
-3. Finally, install the Flask server dependencies by navigating to the `impedance/` directory and running:
-  ```bash
-    pip install -r requirements.txt
-  ```
+2. Finally, install the Flask server dependencies by navigating to the `impedance/` directory and running:
+      ```bash
+        pip install -r requirements.txt
+      ```
 
 <!-- Adjust the Backend Server URL in the Frontend Module -->
 ### 3. Adjust the Backend Server URL in the Frontend Module
