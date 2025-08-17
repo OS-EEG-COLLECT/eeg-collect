@@ -181,7 +181,7 @@ http://localhost:8080/setup-device?aHCWFRZvlU=[access_key]&AbXHPCkszw=[your_sess
 The Web App will guide you through the setup process, including connecting your Wellenkern BURSTS EEG headset and checking electrode impedance.
 After the setup, you can start recording EEG data by clicking the "Start Recording" button. To end the recording, simply click the "Stop Recording" button.
 
-## 3. Access the Recorded Data
+### 3. Access the Recorded Data
 After you have successfully recorded your EEG data, you can access the recorded files in the `backend/recordings/` directory, either on your local machine or on the server where the backend is hosted.
 
 <br />
