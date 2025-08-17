@@ -4,7 +4,7 @@
   <h1>Wellenkern STREAMS</h1>
   
   <p>
-    A web-based platform for bio-signal data collection using Wellenkern wearables BURSTS (EEG) and BEAMS (fNIRS, coming later). 
+    A web-based platform for bio-signal data collection using Wellenkern BURSTS EEG Headphones. 
   </p>
   
   
@@ -64,7 +64,7 @@
 
 <br />
 
-Weelenkern STREAMS provides a customizable, user-friendly platform for EEG data collection using OpenBCI hardware.
+Weelenkern STREAMS provides a customizable, user-friendly platform for EEG data collection based on OpenBCI hardware.
 It streamlines the setup process and supports versatile electrode configurations, making EEG-based BCI research more accessible.
 The Vue 3 and D3.js frontend offers real-time impedance feedback during the setup phase, helping the user establish a stable connection with Wellenkern BURSTS,
 while the backend — built with Apache, Node.js, and Flask — handles efficient data transmission and storage.
@@ -74,12 +74,12 @@ the platform is well-suited for large-scale and field studies, offering automate
 <!-- Key Features -->
 ### Key Features
 
-| Feature                                      | Description                                                                                                                                                                                                                                                                                                                                                 |
-|-----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Accessible GUI for EEG data collection        | User-friendly interface guides users through headset setup, ensures good signal quality, and automates data processing and saving, enabling high-quality data collection in the field.                                                                                                                               |
-| Real-time impedance checks for electrode stability | Provides real-time, color-coded impedance feedback to help users ensure electrodes are properly connected and stable, making it easy to identify and resolve connection issues—even in field studies.                                                                           |
-| Customizable electrode configurations         | Supports a range of predefined or custom electrode configurations, allowing researchers to adapt the setup to their specific needs and ensuring flexibility in data collection.                                                                                                |
-| Efficient data transmission and storage       | Utilizes Node.js and Flask for efficient data transmission and storage via WebSocket, enabling low-latency, high-throughput data handling and easy access for further analysis.                                                                                                |
+| Feature                                      | Description                                                                                                                                                                                             |
+|-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Accessible GUI for EEG data collection        | User-friendly interface guides users through headset setup, ensures good signal quality, and automates data processing and saving, enabling high-quality data collection in the field.                  |
+| Real-time impedance checks for electrode stability | Provides real-time, color-coded impedance feedback to help users ensure electrodes are properly connected and stable, making it easy to identify and resolve connection issues — even in field studies. |
+| Customizable electrode configurations         | Supports a range of predefined or custom electrode configurations, allowing researchers to adapt the setup to their specific needs and ensuring flexibility in data collection.                         |
+| Efficient data transmission and storage       | Utilizes Node.js and Flask for efficient data transmission and storage via WebSocket, enabling low-latency, high-throughput data handling and easy access for further analysis.                         |
 
 <br />
 
@@ -104,7 +104,7 @@ Install my-project with npm
 <!-- Install Dependencies -->
 ### 2. Install Dependencies
 
-1. To instll the frontend dependencies, navigate to the `frontend/` directory and run:
+1. To install the frontend dependencies, navigate to the `frontend/` directory and run:
   ```bash
     npm install
   ```
@@ -189,7 +189,45 @@ After you have successfully recorded your EEG data, you can access the recorded 
 <!-- Deployment -->
 ## :cloud: Deployment
 
-To deploy this project run
+> **Note:**  
+> To use systemctl for managing the backend (websocket) and Flask server (flask_server), you need to create appropriate systemd service files for each.
+For serving the frontend, configure Apache to serve the files from the `frontend/dist/` directory.
+Refer to the official documentation for Apache and systemd if you need setup details.
+
+You can deploy this project using any web server that supports Node.js and Flask. Here are the general steps:
+1. **Set up a web server**: On your server, ensure that you have Apache, Node.js and Flask installed.
+2. **Clone the repository**: Clone this repository as described in the "Getting Started" section.
+3. **Install dependencies**: Follow the instructions in the "Installation" section to install the necessary dependencies for the frontend, backend and flask server.
+4. **Configure the backend URL**: Adjust the backend server URL in the frontend module as described in the "Adjust the Backend Server URL in the Frontend Module" section. The Frontend should now point to your server's backend URL.
+5. **Create and enable systemd service files**:  
+   Create systemd service files for the backend (`websocket`) and Flask server (`flask_server`) in `/etc/systemd/system/`.
+
+   Please refer to the official documentation for systemd if you need help creating service files.
+6. **Start the services**:  
+   After creating the service files, reload systemd and enable the services to start on boot
+    ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable websocket
+   sudo systemctl start websocket
+   sudo systemctl enable flask_server
+   sudo systemctl start flask_server
+   ```
+   
+
+### Update your Server
+On the server, pull the current main branch of this repository into your local copy. Then, rebuild the frontend and restart the all services using the following commands:
+   - For the frontend:
+     ```bash
+     cd frontend
+     npm install
+     npm run build
+     systemctl restart apache2
+     ```
+   - For the backend and flask server:
+     ```bash
+     systemctl restart websocket
+     systemctl restart flask_server
+     ```
 
 <br />
 
