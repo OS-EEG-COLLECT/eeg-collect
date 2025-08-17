@@ -176,19 +176,11 @@ http://localhost:8080/setup-device?aHCWFRZvlU=[access_key]&AbXHPCkszw=[your_sess
 ```
 #### Query Parameters Explained
 
-- `aHCWFRZvlU`  
-  **Access Key (Guard):**  
-  This is a required access key to use the web app.   
-  **How to get the key:** Contact the developer to receive your access key.
-
-- `AbXHPCkszw`  
-  **Session Name:**  
-  This parameter defines the name of your recording session. All files generated during this session will be prefixed with this name.
-
-- `wlmtdoqtqe`  
-  **Configuration:**  
-  This parameter specifies the EEG headset configuration. Use any uppercase letter from `A` to `I`. Each letter corresponds to a different electrode placement setup.
-
+| Parameter        | Description                                                                                                   |
+|------------------|--------------------------------------------------------------------------------------------------------------|
+| `aHCWFRZvlU`     | **Access Key (Guard):** Required to access the web app. Contact the developer to receive your access key.    |
+| `AbXHPCkszw`     | **Session Name:** Name of your recording session. All generated files will be prefixed with this name.        |
+| `wlmtdoqtqe`     | **Configuration:** EEG headset configuration. Use any uppercase letter from `A` to `I` for electrode setup.   |
 
 <br />
 
