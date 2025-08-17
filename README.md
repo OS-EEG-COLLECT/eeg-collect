@@ -154,7 +154,7 @@ To start the services, execute the following commands in separate terminal insta
    ```bash
    npm run serve
    ```
- 2. **Backend**:  
+2. **Backend**:  
    Navigate to the `backend/` directory and run:
    ```bash
    node websocket.js
