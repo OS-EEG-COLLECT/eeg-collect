@@ -114,11 +114,11 @@ Clone the repository to your local machine using the following commands:
         pip install -r requirements.txt
       ```
 
-<!-- Adjust the Backend Server URL in the Frontend Module -->
+<!-- Adjust the Websocket Server URL in the Frontend Module -->
 ### 3. Adjust the Backend Server URL in the Frontend Module
 
-During data recording, the frontend service continuously streams signal data to the backend server.
-To ensure that the frontend can communicate with the backend, you need to adjust the backend server URL in the frontend module.
+During data recording, the frontend service continuously streams signal data to the websocket server.
+To ensure that the frontend can communicate with the server, you need to adjust the websocket server URL in the frontend module.
 <br /> To do so, open the `frontend/src/utils/helpers.ts` file, and set the `WEB_SOCKET_URL` property of the `URLs` object to your server:
 
 **A. If you have [deployed your own server](#cloud-deployment):**
@@ -148,11 +148,19 @@ To start the services, execute the following commands in separate terminal insta
    ```bash
    npm run serve
    ```
-2. **Backend**:  
-   Navigate to the `backend/` directory and run:
+2. **Backend and Websocket**:  
+   Navigate to the `backend/` directory and start the server using Node.js:
    ```bash
-   node websocket.js
+   node server.js
    ```
+   This will start the backend server on port `8080` by default. You can change the port in the `backend/server.js` file if needed.
+
+   Then, in another terminal instsance, start the WebSocket server by running:
+   ```bash
+    node websocket.js
+    ```
+   This will start the WebSocket server on port `3000` by default. You can change the port in the `backend/websocket.js` file if needed. Remember to [adjust the `WEB_SOCKET_URL`](#3-adjust-the-backend-server-url-in-the-frontend-module) in the frontend module accordingly.
+   
 3. **Flask Server**:
     Navigate to the `impedance/` directory and run:
     ```bash
