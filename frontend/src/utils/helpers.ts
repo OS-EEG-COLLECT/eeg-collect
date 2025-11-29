@@ -5,7 +5,7 @@ import {
   OpenBCISerialData,
 } from "@/utils/openBCISerialTypes";
 
-export const URLs = { WEB_SOCKET_URL: "wss://exg.iism.kit.edu/websocket/" };
+export const URLs = { WEB_SOCKET_URL: "ws://localhost:3000/websocket/" }; // TODO adjusted for dev - org: "wss://exg.iism.kit.edu/websocket/"
 
 export const URL_PARAMS = {
   participantIdParam: "AbXHPCkszw",
@@ -23,7 +23,8 @@ export const getIsPassphraseValid = async (): Promise<boolean> => {
 
   const passphrase = urlRoute.query[URL_PARAMS.passPhrase];
   if (passphrase) {
-    return atob(`${passphrase}`) === DECODED_PASSPHRASE;
+    // return atob(`${passphrase}`) === DECODED_PASSPHRASE;  // TODO uncommented for dev
+    return true;
   }
 
   return false;

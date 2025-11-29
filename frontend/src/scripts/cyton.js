@@ -554,6 +554,7 @@ export class cyton {
     }
   }
   async decodeDaisy(chunk) {
+    console.log("Decoding Daisy", chunk); // TODO added for dev
     if (this.ws.readyState === WebSocket.OPEN) {
       try {
         this.ws.send(chunk);
@@ -566,6 +567,7 @@ export class cyton {
   }
 
   async decodeChunk(chunk) {
+    console.log("Decoding chunk", chunk); // TODO added for dev
     if (this.ws.readyState === WebSocket.OPEN) {
       try {
         this.ws.send(chunk);
