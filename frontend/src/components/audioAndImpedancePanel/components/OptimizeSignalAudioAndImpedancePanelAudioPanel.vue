@@ -54,7 +54,7 @@ watch(
   () => hasUserReadInstructions.value,
   () => {
     timer = setInterval(() => {
-      if (progress.value < 5) { // TODO Modified for dev -> org: progress.value < 100
+      if (progress.value < 100) {
         progress.value += 1.67; // 100 / 60 = 1.67 (approximately)
       } else {
         isTimerFinished.value = true;
