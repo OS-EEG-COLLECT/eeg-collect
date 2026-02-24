@@ -111,6 +111,17 @@ export const useWebsocketConnection = async (): Promise<WebSocket | null> => {
   return ws;
 };
 
+// Module-level buffer for unthrottled EEG data access
+// This allows other composables to access fresh data without the 500-1000ms throttling
+export const unthrottledBufferRef = ref<OpenBCISerialData[]>([]);
+
+// Generation counter to prevent multiple concurrent serial read loops.
+// Each call to startSignalQualityCheck increments this; old loops detect the
+// mismatch and exit, ensuring only one loop reads from the serial reader.
+let readLoopGeneration = 0;
+// Skip sending a stop command when we intentionally switch modes (e.g., resuming after impedance)
+let skipRecordingModeStop = false;
+
 export const useOpenBCIUtils = () => {
   // ---- STATE ----
 
@@ -276,6 +287,9 @@ export const useOpenBCIUtils = () => {
 
   // Wie readData() in cyton.js
   const startSignalQualityCheck = async () => {
+    // Increment generation so any previously running read loop will exit
+    const myGeneration = ++readLoopGeneration;
+
     isRecording.value = true;
 
     let chunkBuffer: any[] = []; // Buffer to accumulate bytes until a complete chunk is formed
@@ -289,7 +303,7 @@ export const useOpenBCIUtils = () => {
     ) => {
       if (caller) console.log(caller);
 
-      while (isRecording.value) {
+      while (isRecording.value && myGeneration === readLoopGeneration) {
         const { value, done } = await readFromStream();
 
         // console.log("received from stream: ", value);
@@ -366,14 +380,14 @@ export const useOpenBCIUtils = () => {
                   const data = decodeCytonData(chunkBuffer);
 
                   if (data) {
-                    if (unthrottledBuffer.length > 1250) {
-                      unthrottledBuffer.shift();
+                    if (unthrottledBufferRef.value.length > 1250) {
+                      unthrottledBufferRef.value.shift();
                     }
 
-                    unthrottledBuffer.push(data);
+                    unthrottledBufferRef.value.push(data);
 
                     // Use the throttled function to update rollingBuffer
-                    throttledUpdateRollingBuffer(unthrottledBuffer);
+                    throttledUpdateRollingBuffer(unthrottledBufferRef.value);
                   }
                   break;
                 }
@@ -470,11 +484,15 @@ export const useOpenBCIUtils = () => {
     watch(recordingMode, async (newValue) => {
       console.log("recordingMode changed to " + recordingMode.value);
       if (newValue) {
-        await stopRecording().then(() => {
-          data.value = OPEN_BCI_CYTON_DATA_DEFAULT_VALUE;
-          isWhileRunning.value = true;
-          readAndDecodeDataFromStream(newValue, "watch recordingMode");
-        });
+        if (!skipRecordingModeStop) {
+          await stopRecording();
+        }
+
+        skipRecordingModeStop = false; // reset flag after handling the change
+
+        data.value = OPEN_BCI_CYTON_DATA_DEFAULT_VALUE;
+        isWhileRunning.value = true;
+        readAndDecodeDataFromStream(newValue, "watch recordingMode");
       }
     });
 
@@ -527,8 +545,6 @@ export const useOpenBCIUtils = () => {
     // Start the initial timeout check
     resetTimeout();
     // let stop = false;
-
-    const unthrottledBuffer: OpenBCISerialData[] = [];
   };
 
   const throttledUpdateRollingBuffer = throttle((data: any) => {
@@ -616,6 +632,7 @@ export const useOpenBCIUtils = () => {
 
     await defaultChannelSettings();
 
+    skipRecordingModeStop = true; // prevent watcher from issuing an extra stop while switching modes
     recordingMode.value = RecordingMode.IMPEDANCE;
 
     if (!port.value || !port.value.writable) {
@@ -651,6 +668,22 @@ export const useOpenBCIUtils = () => {
     }
 
     await exportImpedanceCSV();
+  };
+
+  // Resume normal recording/streaming after completing the impedance check.
+  const resumeRecordingAfterImpedance = async () => {
+    if (!port.value || !port.value.writable) {
+      console.error("Serial port is not writable, cannot resume recording");
+      return;
+    }
+
+    skipRecordingModeStop = true; // avoid sending another stop right after we start
+
+    await commandBoardStartStreamingData(RecordingMode.RECORDING);
+
+    isRecording.value = true;
+    isRecordingPaused.value = false;
+    isReadingDataStopped.value = false;
   };
 
   const sendAudioSignalStartMessage = async () => {
@@ -1172,6 +1205,7 @@ export const useOpenBCIUtils = () => {
     signalRMS,
     throttledBuffer,
     runImpedanceCheck,
+    resumeRecordingAfterImpedance,
     isImpedanceCheckRunning,
     impedanceCheckChannel,
     sendAudioSignalStartMessage,

@@ -3,4 +3,6 @@ export const ROUTES = {
   OPTIMIZE_SIGNAL: "/optimize-signal",
   RECORDING: "/recording",
   FINISH: "/finish",
+  DEMO: "/demo",
+  SANDBOX: "/sandbox",
 };

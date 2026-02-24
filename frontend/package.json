@@ -11,6 +11,7 @@
   "dependencies": {
     "@mdi/font": "5.9.55",
     "@phosphor-icons/vue": "^2.2.1",
+    "@thi.ng/dsp": "^4.7.101",
     "axios": "^1.6.7",
     "browserify-fs": "^1.0.0",
     "chart.js": "^2.9.3",
@@ -26,6 +27,7 @@
     "path": "^0.12.7",
     "roboto-fontface": "*",
     "vue": "^3.2.13",
+    "vue-inline-svg": "^4.0.1",
     "vue-router": "^4.0.3",
     "vue3-charts": "^1.1.33",
     "vuetify": "^3.0.0-beta.0",
@@ -58,7 +60,8 @@
   "eslintConfig": {
     "root": true,
     "env": {
-      "node": true
+      "node": true,
+      "vue/setup-compiler-macros": true
     },
     "extends": [
       "plugin:vue/vue3-essential",

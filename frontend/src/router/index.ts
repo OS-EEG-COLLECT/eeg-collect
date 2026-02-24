@@ -11,6 +11,8 @@ import OptimizeSignalAndImpedancePage from "@/pages/optimizeSignalAndImpedancePa
 import RecordingPage from "@/pages/recordingPage/RecordingPage.vue";
 import FinishPage from "@/pages/FinishPage.vue";
 import { ROUTES } from "@/utils/routes";
+import DemoPage from "@/features/eeg-demo/DemoPage.vue";
+import SandBox from "@/features/eeg-demo/SandboxPage.vue";
 
 let validNavigation = false;
 
@@ -37,6 +39,16 @@ const routes = [
     path: "/finish",
     component: FinishPage,
   },
+  {
+    path: "/demo",
+    component: DemoPage,
+    meta: { requiresRef: true },
+  },
+  {
+    path: "/sandbox",
+    component: SandBox,
+    meta: { requiresRef: true },
+  }
 ];
 
 const router = createRouter({

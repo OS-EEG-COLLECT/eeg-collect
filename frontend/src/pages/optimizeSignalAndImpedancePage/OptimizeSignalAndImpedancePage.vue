@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ComputedRef, onMounted, Ref, ref, watch } from "vue";
+import { navigateToRestricted } from "@/router";
 
 import BasePage from "@/components/BasePage.vue";
 import {
@@ -21,16 +22,22 @@ import {
   PhArrowRight,
   PhCheckCircle,
   PhWarningCircle,
+  PhGameController,
+  PhFlask,
 } from "@phosphor-icons/vue";
 import OptimizeSignalAside from "@/pages/optimizeSignalAndImpedancePage/aside/OptimizeSignalAside.vue";
 import OptimizeSignalAudioAndImpedancePanel from "@/components/audioAndImpedancePanel/OptimizeSignalAudioAndImpedancePanel.vue";
 import CHANNEL_ASSIGNMENT from "../../config/channelAssignment.json";
 import { ROUTES } from "@/utils/routes";
+import { useRoute } from "vue-router";
+import dolphinControllerSvg from "@/features/eeg-demo/assets/support_dolphin_controller.svg";
 
 // ---- STATE ----
 
 useConfigureParticipantId();
 useWebsocketConnection();
+
+const route = useRoute();
 
 const channelAssignment = computed(
   () => CHANNEL_ASSIGNMENT[channelConfig.value!],
@@ -296,6 +303,14 @@ const handleBeforeUnload = (event: BeforeUnloadEvent) => {
 const handleRedirectToRecording = async () => {
   isAudioAndImpedancePanelOpen.value = true;
 };
+
+const handleRedirectToDemo = () => {
+  navigateToRestricted(ROUTES.DEMO, route.query);
+};
+
+const handleRedirectToSandbox = () => {
+  navigateToRestricted(ROUTES.SANDBOX, route.query);
+}
 </script>
 
 <template>
@@ -389,6 +404,53 @@ const handleRedirectToRecording = async () => {
       minute. <br />Afterwards, the recording is started and you can start with
       your task.
     </p>
+
+    <VRow justify="center" class="mt-6 mb-4">
+      <VCard
+        max-width="520"
+        class="pa-2"
+      >
+        <div class="d-flex align-center">
+          <!-- Dolphin Mascot -->
+          <img
+            :src="dolphinControllerSvg"
+            alt="Demo mascot"
+            style="width: 56px; height: 56px; flex-shrink: 0;"
+            class="mr-4"
+          />
+
+          <!-- Content Section -->
+          <div class="flex-grow-1 mr-4">
+            <p class="text-subtitle-1 mb-1" style="font-weight: 600; color: rgba(0, 0, 0, 0.87);">
+              Try ASSR EEG Demo
+            </p>
+            <p class="mb-0" style="font-size: 13px; color: #939393; font-weight: 500;">
+              Experience brain-controlled gaming. Test in Demo Mode or experiment in Sandbox.
+            </p>
+          </div>
+
+          <!-- Buttons Section -->
+          <div class="d-flex flex-column" style="flex-shrink: 0; gap: 4px;">
+            <v-btn
+              size="small"
+              :prepend-icon="PhGameController"
+              @click="handleRedirectToDemo"
+              style="min-width: 120px; justify-content: flex-start;"
+            >
+              Demo Mode
+            </v-btn>
+            <v-btn
+              size="small"
+              :prepend-icon="PhFlask"
+              @click="handleRedirectToSandbox"
+              style="min-width: 120px; justify-content: flex-start;"
+            >
+              Sandbox
+            </v-btn>
+          </div>
+        </div>
+      </VCard>
+    </VRow>
   </BasePage>
 
   <OptimizeSignalAudioAndImpedancePanel

@@ -1,3 +1,14 @@
+# General
+.DS_Store
+
+# Backend-specific
 backend/node_modules
+backend/recordings
+
+# Python virtual environments
 venv/
+.venv
+
+# IDE
 .idea/
+.vscode/

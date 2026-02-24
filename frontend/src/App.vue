@@ -19,7 +19,7 @@ onMounted(async () => {
   <div id="app">
     <!-- Application Header with Menu Button -->
     <header style="z-index: 5000">
-      <LogoIcon style="width: 60px" />
+      <LogoIcon style="width: 60px; height: 60px" />
       <!-- <h1 class="app-title">EEG Aufnahme</h1> -->
       <h1 class="app-title">EEG Recording</h1>
     </header>
@@ -49,8 +49,8 @@ onMounted(async () => {
 body {
   box-sizing: border-box !important;
   height: 100vh;
-  width: 100vw;
-  max-width: 100vw;
+  width: 100%;
+  max-width: 100%;
   display: flex;
 }
 
