@@ -5,7 +5,7 @@ import {
   OpenBCISerialData,
 } from "@/utils/openBCISerialTypes";
 
-export const URLs = { WEB_SOCKET_URL: "wss://exg.iism.kit.edu/websocket/" };
+export const URLs = { WEB_SOCKET_URL: "wss://exg.win.kit.edu/websocket/" };
 
 export const URL_PARAMS = {
   participantIdParam: "AbXHPCkszw",
