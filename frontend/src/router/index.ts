@@ -6,6 +6,8 @@ import {
   RouteLocationNormalized,
 } from "vue-router";
 
+import LoginPage from "@/pages/loginPage/LoginPage.vue";
+import DashboardPage from "@/pages/dashboardPage/DashboardPage.vue";
 import SetupDevicePage from "@/pages/setupDevicePage/SetupDevicePage.vue";
 import OptimizeSignalAndImpedancePage from "@/pages/optimizeSignalAndImpedancePage/OptimizeSignalAndImpedancePage.vue";
 import RecordingPage from "@/pages/recordingPage/RecordingPage.vue";
@@ -17,8 +19,20 @@ let validNavigation = false;
 const routes = [
   {
     path: "/",
-    redirect: "start",
+    redirect: "login",
   },
+  // Part 1 for Researchers (IAM and Dashboard)
+  {
+    path: "/login",
+    component: LoginPage,
+    meta: { requiresAuth: false},
+  },
+  {
+    path: "/dashboard",
+    component: DashboardPage,
+    meta: { requiresAuth: true},
+  },
+  // Part 2 for sessions of a study
   {
     path: "/setup-device",
     component: SetupDevicePage,
@@ -45,6 +59,14 @@ const router = createRouter({
 });
 
 router.beforeEach((to, from, next) => {
+  const isAuthenticated = !!localStorage.getItem("user_token");
+
+  if (to.meta.requiresAuth && !isAuthenticated) {
+    next({path: "/login"});
+
+    return;
+  }
+
   if (to.meta.requiresRef && !validNavigation) {
     next({ path: ROUTES.SETUP_DEVICE, query: to.query });
 

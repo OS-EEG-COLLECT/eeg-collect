@@ -12,11 +12,16 @@ app.use(cors());
 app.use(formidable());
 
 app.post("/save-csv", (req, res) => {
-  const fileName = req.fields.fileName;
-  const csvContent = req.fields.csvContent;
+  const { fileName, csvContent, researcherId, studyId, participantId, startTime } = req.fields;
 
-  // Save the CSV content to a file with the provided filename
-  fs.writeFile(__dirname + "/recordings/" + fileName, csvContent, (err) => {
+  // If the frontend told us which session this belongs to, save next to the
+  // rest of that session's files (Recording.csv, Setup.csv). Otherwise fall
+  // back to the flat recordings folder.
+  const targetDir = researcherId && studyId && participantId && startTime
+    ? path.join(__dirname, "recordings", researcherId, studyId, participantId, startTime)
+    : path.join(__dirname, "recordings");
+
+  fs.writeFile(path.join(targetDir, fileName), csvContent, (err) => {
     if (err) {
       console.error("Error:", err);
       return res.status(500).json({ error: "Internal server error" });

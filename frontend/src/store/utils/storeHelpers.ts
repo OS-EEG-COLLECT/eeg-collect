@@ -10,4 +10,5 @@ export const STATE_DEFAULT_CONFIG: State = {
   webSocket: null,
   mode: null,
   webSerial: { port: undefined, reader: undefined },
+  sessionFolder: null,
 };

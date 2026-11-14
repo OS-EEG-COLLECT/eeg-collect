@@ -228,9 +228,7 @@ export class cyton {
   exportImpedanceCSV(participantNumber) {
     const objectKeys = Object.keys(this.impedance);
     const csvContent = this.parseAndExportImpedance(this.impedance, objectKeys);
-    const startTime = Math.floor(
-      new Date(this.startRecording).getTime() / 1000,
-    );
+    const startTime = this.startRecording.replace(" ", "_").replace(/:/g, "-");
     const fileName = `${participantNumber}-${startTime}-Impedance.csv`;
 
     const formData = new FormData();

@@ -11,9 +11,12 @@ export const URL_PARAMS = {
   participantIdParam: "AbXHPCkszw",
   passPhrase: "aHCWFRZvlU",
   channelConfig: "wlmtdoqtqe",
+  studyIdParam: "nVqTzXoRmP",
 };
 
 const DECODED_PASSPHRASE = "iism4ever";
+
+export const getEncodedPassphrase = () => btoa(DECODED_PASSPHRASE);
 
 export const getIsPassphraseValid = async (): Promise<boolean> => {
   const urlRoute = useRoute();

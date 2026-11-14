@@ -4,6 +4,14 @@ export type State = {
   webSocket: WebSocket | null;
   mode: ConnectionMode | null;
   webSerial: WebSerial;
+  sessionFolder: SessionFolder | null;
+};
+
+export type SessionFolder = {
+  researcherId: string;
+  studyId: string;
+  participantId: string;
+  startTime: string;
 };
 
 export enum ConnectionMode {

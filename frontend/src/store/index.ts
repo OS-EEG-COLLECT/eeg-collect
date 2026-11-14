@@ -1,7 +1,7 @@
 import { InjectionKey } from "vue";
 import { createStore, Store, useStore as baseUseStore } from "vuex";
 
-import { ConnectionMode, State } from "@/store/utils/storeTypes";
+import { ConnectionMode, SessionFolder, State } from "@/store/utils/storeTypes";
 import { injectionKey, STATE_DEFAULT_CONFIG } from "@/store/utils/storeHelpers";
 
 const store = createStore<State>({
@@ -23,6 +23,9 @@ const store = createStore<State>({
     },
     setWebSocket(state, payload: { websocket: WebSocket }) {
       state.webSocket = payload.websocket;
+    },
+    setSessionFolder(state, payload: { sessionFolder: SessionFolder }) {
+      state.sessionFolder = payload.sessionFolder;
     },
     setConnectionMode(state, payload: { connectionMode: ConnectionMode }) {
       state.mode = payload.connectionMode;

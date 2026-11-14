@@ -68,6 +68,7 @@ export const useWebsocketConnection = async (): Promise<WebSocket | null> => {
   const channelConfig = computed(
     () => UrlRoute.query[URL_PARAMS.channelConfig],
   );
+  const studyId = computed(() => UrlRoute.query[URL_PARAMS.studyIdParam]);
   const channelAssignment = CHANNEL_ASSIGNMENT[`${channelConfig.value}`] || {};
   const mode =
     Object.keys(channelAssignment).length > 8
@@ -78,7 +79,8 @@ export const useWebsocketConnection = async (): Promise<WebSocket | null> => {
     !channelConfig.value ||
     !channelAssignment ||
     !mode ||
-    !participantId.value
+    !participantId.value ||
+    !studyId.value
   ) {
     return null;
   }
@@ -96,11 +98,34 @@ export const useWebsocketConnection = async (): Promise<WebSocket | null> => {
         console.error("WebSocket error:", error);
         reject(error);
       };
+
+      socket.onmessage = (event) => {
+        if (typeof event.data !== "string" || !event.data.startsWith("{")) {
+          return;
+        }
+
+        try {
+          const parsed = JSON.parse(event.data);
+
+          if (parsed.event === "session_folder") {
+            store.commit("setSessionFolder", {
+              sessionFolder: {
+                researcherId: parsed.researcherId,
+                studyId: parsed.studyId,
+                participantId: parsed.participantId,
+                startTime: parsed.startTime,
+              },
+            });
+          }
+        } catch (error) {
+          // Not a JSON control message (e.g. raw EEG data) — ignore
+        }
+      };
     });
 
   console.log("A");
   const ws = await createWebSocket(
-    `${URLs.WEB_SOCKET_URL}${mode}/${participantId.value}/`,
+    `${URLs.WEB_SOCKET_URL}${mode}/${participantId.value}/?studyId=${studyId.value}`,
   );
 
   console.log("B");
@@ -112,6 +137,28 @@ export const useWebsocketConnection = async (): Promise<WebSocket | null> => {
 };
 
 export const useOpenBCIUtils = () => {
+
+
+  const logToBackend = (level: 'warn' | 'error', message: string, details?: any) => {
+    if (level === 'error') console.error(`${message}`, details || '');
+    if (level === 'warn') console.warn(`${message}`, details || '');
+
+    const serializedDetails = details instanceof Error
+      ? JSON.stringify({ name: details.name, message: details.message, stack: details.stack })
+      : details
+        ? JSON.stringify(details)
+        : null;
+
+    if (ws.value && ws.value.readyState === WebSocket.OPEN) {
+      ws.value.send(JSON.stringify({
+        event: "frontend_log",
+        level: level,
+        message: message,
+        details: serializedDetails
+      }));
+    }
+  };
+
   // ---- STATE ----
 
   const isRecordingPaused = ref<boolean>(false);
@@ -137,6 +184,7 @@ export const useOpenBCIUtils = () => {
 
   const store = useStore();
   const ws = computed(() => store.state.webSocket);
+  const sessionFolder = computed(() => store.state.sessionFolder);
 
   const participantId = computed(() => store.state.participantId);
 
@@ -245,23 +293,25 @@ export const useOpenBCIUtils = () => {
       if (port.value && port.value.writable) {
         const writer = port.value.writable.getWriter();
 
-        await writer.write(
-          getEncodedCytonCommand(CytonBoardCommands.STOP_STREAMING),
-        );
-        console.log("Cyton Streaming stopped");
-        writer.releaseLock();
+        try {
+          await writer.write(
+            getEncodedCytonCommand(CytonBoardCommands.STOP_STREAMING),
+          );
+          console.log("Cyton Streaming stopped");
+        } finally {
+          writer.releaseLock();
+        }
       } else {
-        console.error("Serial port is not writable");
+        logToBackend("error", "Serial port is not writable");
       }
     } catch (error) {
-      console.error("Error stopping recording:", error);
+      logToBackend("error", "Error stopping recording:", error);
     }
   };
 
   const startRecording = async () => {
     if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
-      console.error("WebSocket not open, chunk not sent.");
-
+      logToBackend("error", "WebSocket not open, chunk not sent.");
       return;
     }
 
@@ -383,7 +433,7 @@ export const useOpenBCIUtils = () => {
               }
 
               if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
-                console.error("WebSocket not open, chunk not sent.");
+                logToBackend("error", "WebSocket not open, chunk not sent.");
                 break;
               }
 
@@ -391,7 +441,7 @@ export const useOpenBCIUtils = () => {
                 //@ts-ignore-next-line
                 ws.value.send(chunkBuffer);
               } catch (err) {
-                console.error("Error sending chunk to WebSocket:", err);
+                logToBackend("error", "Error sending chunk to WebSocket:", err);
               }
             } else if (
               specifiedRecordingMode === RecordingMode.IMPEDANCE ||
@@ -419,7 +469,7 @@ export const useOpenBCIUtils = () => {
               switch (mode.value) {
                 case ConnectionMode.CYTON: {
                   if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
-                    console.error("WebSocket not open, chunk not sent.");
+                    logToBackend("error", "WebSocket not open, chunk not sent.");
                     break;
                   }
 
@@ -427,7 +477,7 @@ export const useOpenBCIUtils = () => {
                     //@ts-ignore-next-line
                     ws.value.send(chunkBuffer);
                   } catch (err) {
-                    console.error("Error sending chunk to WebSocket:", err);
+                    logToBackend("error", "Error sending chunk to WebSocket:", err);
                   }
 
                   break;
@@ -440,7 +490,7 @@ export const useOpenBCIUtils = () => {
 
             chunkBuffer = []; // Reset buffer for the next chunk
           } catch (error) {
-            console.error("Error in second part of for loop:", error);
+            logToBackend("error", "Error in second part of for loop:", error);
           }
         }
       }
@@ -584,7 +634,7 @@ export const useOpenBCIUtils = () => {
 
       return returnStatus;
     } catch (error) {
-      console.error("Error connecting to serial port:", error);
+      logToBackend("error", "Error connecting to serial port:", error);
 
       if (port.value && !isEmpty(port.value.getInfo())) {
         console.log("Port Info");
@@ -604,7 +654,7 @@ export const useOpenBCIUtils = () => {
         setIsLoadingModalShown(false);
       }
 
-      // TODO Wenn die App Unmounted, Reader releasen. Aber nicht hier!!!
+      // TODO: Release the reader when the app is unmounted, but not here!
     }
   };
 
@@ -619,7 +669,7 @@ export const useOpenBCIUtils = () => {
     recordingMode.value = RecordingMode.IMPEDANCE;
 
     if (!port.value || !port.value.writable) {
-      console.error("Serial port is not writable, Imdpedance check failed");
+      logToBackend("error", "Serial port is not writable, Imdpedance check failed");
 
       return;
     }
@@ -655,7 +705,7 @@ export const useOpenBCIUtils = () => {
 
   const sendAudioSignalStartMessage = async () => {
     if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
-      console.error("WebSocket not open, chunk not sent.");
+      logToBackend("error", "WebSocket not open, chunk not sent.");
       return;
     }
 
@@ -664,7 +714,7 @@ export const useOpenBCIUtils = () => {
 
   const sendAudioSignalEndMessage = async () => {
     if (!ws.value || ws.value.readyState !== WebSocket.OPEN) {
-      console.error("WebSocket not open, chunk not sent.");
+      logToBackend("error", "WebSocket not open, chunk not sent.");
       return;
     }
 
@@ -719,10 +769,10 @@ export const useOpenBCIUtils = () => {
 
         writer.releaseLock();
       } else {
-        console.error("Serial port is not writable");
+        logToBackend("error", "Serial port is not writable");
       }
     } catch (error) {
-      console.error("Error starting recording:", error);
+      logToBackend("error", "Error starting recording:", error);
     }
   };
 
@@ -753,7 +803,7 @@ export const useOpenBCIUtils = () => {
     const channelCheckResetCommand = resetCommands[channel - 1];
 
     if (!channelCheckStartCommand || !channelCheckResetCommand) {
-      console.error("Invalid channel index:", channel);
+      logToBackend("error", "Invalid channel index:", channel);
 
       return;
     }
@@ -761,7 +811,7 @@ export const useOpenBCIUtils = () => {
     try {
       // Check if the port is writable before writing data
       if (!port.value || !port.value.writable) {
-        console.error("Serial port is not writable");
+        logToBackend("error", "Serial port is not writable");
 
         return;
       }
@@ -787,7 +837,7 @@ export const useOpenBCIUtils = () => {
       console.log("Reset command sent for channel " + channel);
       writer.releaseLock();
     } catch (error) {
-      console.error("Error sending commands:", error);
+      logToBackend("error", "Error sending commands:", error);
     }
   };
 
@@ -795,7 +845,7 @@ export const useOpenBCIUtils = () => {
     try {
       // Check if the port is writable before writing data
       if (!port.value || !port.value.writable) {
-        console.error("Serial port is not writable");
+        logToBackend("error", "Serial port is not writable");
 
         return;
       }
@@ -834,7 +884,7 @@ export const useOpenBCIUtils = () => {
         impedanceValue.impedance,
       );
     } catch (error) {
-      console.error("Error stopping recording:", error);
+      logToBackend("error", "Error stopping recording:", error);
     }
 
     data.value = OPEN_BCI_CYTON_DATA_DEFAULT_VALUE;
@@ -920,7 +970,7 @@ export const useOpenBCIUtils = () => {
 
     // Check if the port is writable before writing data
     if (!port.value || !port.value.writable) {
-      console.error("Serial port is not writable");
+      logToBackend("error", "Serial port is not writable");
       return;
     }
 
@@ -940,7 +990,7 @@ export const useOpenBCIUtils = () => {
       writer.releaseLock();
       isRecording.value = true;
     } catch (error) {
-      console.error("Error starting recording:", error);
+      logToBackend("error", "Error starting recording:", error);
     }
   };
 
@@ -949,7 +999,7 @@ export const useOpenBCIUtils = () => {
     const reader = store.getters.webSerialReader || {};
 
     if (!reader) {
-      console.error("No reader found");
+      logToBackend("error", "No reader found");
       return CHECK_CONNECTED_DEVICE_STATUS.NO_DATA_STREAMED;
     }
 
@@ -1034,7 +1084,7 @@ export const useOpenBCIUtils = () => {
 
   const retrieveAndResetReader = () => {
     if (!port.value) {
-      console.error("No port found");
+      logToBackend("error", "No port found");
       return;
     }
 
@@ -1046,7 +1096,7 @@ export const useOpenBCIUtils = () => {
 
   const readFromStream = async () => {
     if (!reader.value) {
-      console.error("No reader found");
+      logToBackend("error", "No reader found");
 
       retrieveAndResetReader();
 
@@ -1058,7 +1108,7 @@ export const useOpenBCIUtils = () => {
 
       return { value, done };
     } catch (err) {
-      console.error("rFS: Error while reading from stream:", err);
+      logToBackend("error", "rFS: Error while reading from stream:", err);
       console.log(reader.value);
 
       console.log("rFS: re-setting reader");
@@ -1085,13 +1135,19 @@ export const useOpenBCIUtils = () => {
       impedanceDataRaw.value,
       objectKeys,
     );
-    const startTime = Math.floor(
-      new Date(impedanceRecordingStartTime.value).getTime() / 1000,
-    );
+    const startTime = impedanceRecordingStartTime.value
+      .replace(" ", "_")
+      .replace(/:/g, "-");
     const fileName = `${participantId.value}-${startTime}-Impedance.csv`;
 
     const formData = new FormData();
     formData.append("fileName", fileName);
+    if (sessionFolder.value) {
+      formData.append("researcherId", sessionFolder.value.researcherId);
+      formData.append("studyId", sessionFolder.value.studyId);
+      formData.append("participantId", sessionFolder.value.participantId);
+      formData.append("startTime", sessionFolder.value.startTime);
+    }
     formData.append("csvContent", csvContent);
 
     await fetch("/api/save-csv", {
@@ -1109,7 +1165,7 @@ export const useOpenBCIUtils = () => {
         isRecording.value = false;
       })
       .catch((error) => {
-        console.error("Error saving CSV file:", error);
+        logToBackend("error", "Error saving CSV file:", error);
       });
   };
 
