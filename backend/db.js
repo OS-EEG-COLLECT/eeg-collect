@@ -1,6 +1,6 @@
 // 1. Define and set the URL BEFORE importing the PrismaClient,
 // so Prisma never reads "undefined".
-const dbUrl = 'file:./dev.db';
+const dbUrl = process.env.DATABASE_URL || 'file:./dev.db';
 process.env.DATABASE_URL = dbUrl;
 
 const { PrismaClient } = require('@prisma/client');
