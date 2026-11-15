@@ -5,8 +5,12 @@ import {
   OpenBCISerialData,
 } from "@/utils/openBCISerialTypes";
 
-export const URLs = { WEB_SOCKET_URL: process.env.VUE_APP_WEB_SOCKET_URL ||
-      "wss://exg.win.kit.edu/websocket/" };
+export const URLs = {
+  WEB_SOCKET_URL: process.env.VUE_APP_WEB_SOCKET_URL ||
+      "wss://exg.win.kit.edu/websocket/",
+  // Base URL for the backend REST API. On the server Apache forwards /iam/ to localhost:3000/api/
+  API_URL: process.env.VUE_APP_API_URL || "/iam",
+};
 
 export const URL_PARAMS = {
   participantIdParam: "AbXHPCkszw",
