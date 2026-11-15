@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import BasePage from "@/components/BasePage.vue";
+import { URLs } from "@/utils/helpers";
 import { PhSignIn, PhWarningCircle } from "@phosphor-icons/vue";
 
 // ---- STATE ----
@@ -31,7 +32,7 @@ const handleLogin = async () => {
   isLoading.value = true;
 
   try {
-    const response = await fetch("http://localhost:3000/api/login", {
+    const response = await fetch(`${URLs.API_URL}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

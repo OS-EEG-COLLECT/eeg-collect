@@ -2,7 +2,7 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import BasePage from "@/components/BasePage.vue";
-import { URL_PARAMS, getEncodedPassphrase } from "@/utils/helpers";
+import { URL_PARAMS, URLs, getEncodedPassphrase } from "@/utils/helpers";
 import {
   PhPlus,
   PhCopy,
@@ -96,7 +96,7 @@ const fetchStudies = async () => {
 
   isLoading.value = true;
   try {
-    const response = await fetch("http://localhost:3000/api/studies/list", {
+    const response = await fetch(`${URLs.API_URL}/studies/list`, {
       headers: authHeaders(),
     });
     if (response.ok) {
@@ -114,7 +114,7 @@ const handleCreateStudy = async () => {
 
   isCreating.value = true;
   try {
-    const response = await fetch("http://localhost:3000/api/studies/create", {
+    const response = await fetch(`${URLs.API_URL}/studies/create`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({
@@ -161,7 +161,7 @@ const handleDeleteStudy = async () => {
   isDeleting.value = true;
   try {
     const response = await fetch(
-      `http://localhost:3000/api/studies/${studyToDelete.value.id}/delete`,
+      `${URLs.API_URL}/studies/${studyToDelete.value.id}/delete`,
       { method: "DELETE", headers: authHeaders() },
     );
 
@@ -189,7 +189,7 @@ const resetCreateUserForm = () => {
 const fetchUsers = async () => {
   isLoadingUsers.value = true;
   try {
-    const response = await fetch("http://localhost:3000/api/users/list", {
+    const response = await fetch(`${URLs.API_URL}/users/list`, {
       headers: authHeaders(),
     });
     if (response.ok) {
@@ -217,7 +217,7 @@ const closeUsersModal = () => {
 const handleToggleAdmin = async (user: ManagedUser, makeAdmin: boolean) => {
   try {
     const response = await fetch(
-      `http://localhost:3000/api/users/${user.id}/admin`,
+      `${URLs.API_URL}/users/${user.id}/admin`,
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -254,7 +254,7 @@ const handleDeleteUser = async () => {
   isDeletingUser.value = true;
   try {
     const response = await fetch(
-      `http://localhost:3000/api/users/${userToDelete.value.id}/delete`,
+      `${URLs.API_URL}/users/${userToDelete.value.id}/delete`,
       { method: "DELETE", headers: authHeaders() },
     );
 
@@ -277,7 +277,7 @@ const handleCreateUser = async () => {
 
   isCreatingUser.value = true;
   try {
-    const response = await fetch("http://localhost:3000/api/register", {
+    const response = await fetch(`${URLs.API_URL}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({
@@ -304,7 +304,7 @@ const handleCreateUser = async () => {
 const handleDownloadStudyData = async (studyId: string) => {
   try {
     const response = await fetch(
-      `http://localhost:3000/api/studies/${studyId}/download`,
+      `${URLs.API_URL}/studies/${studyId}/download`,
       { headers: authHeaders() },
     );
 
