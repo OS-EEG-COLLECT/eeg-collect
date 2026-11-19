@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import BasePage from "@/components/BasePage.vue";
 import { URL_PARAMS, URLs, getEncodedPassphrase } from "@/utils/helpers";
@@ -13,6 +13,8 @@ import {
   PhUsers,
   PhDownloadSimple,
   PhSignOut,
+  PhEye,
+  PhEyeSlash,
 } from "@phosphor-icons/vue";
 
 // ---- TYPES ----
@@ -71,7 +73,25 @@ const users = ref<ManagedUser[]>([]);
 const isCreatingUser = ref(false);
 const newUsername = ref("");
 const newUserPassword = ref("");
+// Second password field, to catch typos
+const newUserPasswordConfirm = ref("");
+// Eye button: shows both password fields as plain text
+const showNewUserPasswords = ref(false);
 const newUserIsAdmin = ref(false);
+
+// Only show the mismatch message once something was typed into the second field
+const newUserPasswordsMismatch = computed(
+  () =>
+    newUserPasswordConfirm.value.length > 0 &&
+    newUserPasswordConfirm.value !== newUserPassword.value,
+);
+
+const canCreateUser = computed(
+  () =>
+    newUsername.value.trim().length > 0 &&
+    newUserPassword.value.trim().length > 0 &&
+    newUserPasswordConfirm.value === newUserPassword.value,
+);
 
 // Delete User Modal State
 const isDeleteUserModalOpen = ref(false);
@@ -183,6 +203,8 @@ const handleDeleteStudy = async () => {
 const resetCreateUserForm = () => {
   newUsername.value = "";
   newUserPassword.value = "";
+  newUserPasswordConfirm.value = "";
+  showNewUserPasswords.value = false;
   newUserIsAdmin.value = false;
 };
 
@@ -273,7 +295,7 @@ const handleDeleteUser = async () => {
 };
 
 const handleCreateUser = async () => {
-  if (!newUsername.value.trim() || !newUserPassword.value.trim()) return;
+  if (!canCreateUser.value) return;
 
   isCreatingUser.value = true;
   try {
@@ -602,16 +624,46 @@ onMounted(() => {
           hide-details="auto"
         ></v-text-field>
 
-        <v-text-field
-          v-model="newUserPassword"
-          label="Password *"
-          type="password"
-          variant="outlined"
-          density="comfortable"
-          class="mb-4"
-          hide-details="auto"
-          @keyup.enter="handleCreateUser"
-        ></v-text-field>
+        <!-- Both password fields share one column, so they always have the same width.
+             The eye button sits next to the first field in its own column. -->
+        <div class="d-flex align-start mb-4" style="gap: 8px;">
+          <div class="flex-grow-1" style="min-width: 0;">
+            <v-text-field
+              v-model="newUserPassword"
+              label="Password *"
+              :type="showNewUserPasswords ? 'text' : 'password'"
+              variant="outlined"
+              density="comfortable"
+              class="mb-4"
+              hide-details="auto"
+            ></v-text-field>
+
+            <v-text-field
+              v-model="newUserPasswordConfirm"
+              label="Repeat password *"
+              :type="showNewUserPasswords ? 'text' : 'password'"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+              :error-messages="newUserPasswordsMismatch ? ['Passwords do not match'] : []"
+              @keyup.enter="handleCreateUser"
+            ></v-text-field>
+          </div>
+
+          <VBtn
+            class="flex-shrink-0"
+            variant="text"
+            color="#737373"
+            icon
+            :width="48"
+            :height="48"
+            :aria-label="showNewUserPasswords ? 'Hide passwords' : 'Show passwords'"
+            @click="showNewUserPasswords = !showNewUserPasswords"
+          >
+            <PhEyeSlash v-if="showNewUserPasswords" :size="20" />
+            <PhEye v-else :size="20" />
+          </VBtn>
+        </div>
 
         <v-checkbox
           v-model="newUserIsAdmin"
@@ -632,7 +684,7 @@ onMounted(() => {
         <VBtn
           color="#00594C"
           style="background-color: #00594C; color: white;"
-          :disabled="!newUsername.trim() || !newUserPassword.trim()"
+          :disabled="!canCreateUser"
           :loading="isCreatingUser"
           @click="handleCreateUser"
         >

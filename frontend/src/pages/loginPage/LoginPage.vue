@@ -3,11 +3,13 @@ import { ref } from "vue";
 import { useRouter } from "vue-router";
 import BasePage from "@/components/BasePage.vue";
 import { URLs } from "@/utils/helpers";
-import { PhSignIn, PhWarningCircle } from "@phosphor-icons/vue";
+import { PhSignIn, PhWarningCircle, PhEye, PhEyeSlash } from "@phosphor-icons/vue";
 
 // ---- STATE ----
 const username = ref("");
 const password = ref("");
+// Eye button: shows the password as plain text
+const showPassword = ref(false);
 const isLoading = ref(false);
 
 const errorModal = ref({
@@ -98,15 +100,30 @@ const handleLogin = async () => {
           hide-details="auto"
         ></v-text-field>
 
-        <v-text-field
-          v-model="password"
-          label="Password"
-          type="password"
-          variant="outlined"
-          density="comfortable"
-          class="mb-6"
-          hide-details="auto"
-        ></v-text-field>
+        <div class="d-flex align-start mb-6" style="gap: 8px;">
+          <v-text-field
+            v-model="password"
+            label="Password"
+            :type="showPassword ? 'text' : 'password'"
+            variant="outlined"
+            density="comfortable"
+            hide-details="auto"
+          ></v-text-field>
+
+          <VBtn
+            class="flex-shrink-0"
+            variant="text"
+            color="#737373"
+            icon
+            :width="48"
+            :height="48"
+            :aria-label="showPassword ? 'Hide password' : 'Show password'"
+            @click="showPassword = !showPassword"
+          >
+            <PhEyeSlash v-if="showPassword" :size="20" />
+            <PhEye v-else :size="20" />
+          </VBtn>
+        </div>
 
         <VBtn
           type="submit"
