@@ -251,7 +251,63 @@ app.post("/api/studies/create", requireAuth, async (req, res) => {
   }
 });
 
+// Session folders live at recordings/<userId>/<studyId>/<participant>/<startTime>.
+// The path is rebuilt from the last two parts of the stored folderPath, so it still
+// works if the recordings folder was moved, and it can never point outside the study.
+const getSessionLocation = (studyDir, session) => {
+  if (!session.folderPath) return null;
+  const startTime = path.basename(session.folderPath);
+  const participant = path.basename(path.dirname(session.folderPath));
+  return {
+    participant,
+    startTime,
+    // zip entries always use forward slashes, also on Windows
+    relativePath: `${participant}/${startTime}`,
+    absolutePath: path.join(studyDir, participant, startTime),
+  };
+};
+
+// study session listing endpoint (used by the download dialog)
+app.get("/api/studies/:id/sessions", requireAuth, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const prisma = await getPrismaClient();
+
+    const study = await prisma.study.findUnique({ where: { id: Number(id) } });
+    if (!study) {
+      return res.status(404).json({ message: "Study not found" });
+    }
+
+    if (study.userId !== req.authUser.id) {
+      return res.status(403).json({ message: "You do not have access to this study." });
+    }
+
+    const studyDir = path.join(RECORDINGS_DIR, `${study.userId}`, `${study.id}`);
+    const sessions = await prisma.session.findMany({
+      where: { studyId: study.id },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json(
+      sessions.map((session) => {
+        const location = getSessionLocation(studyDir, session);
+        return {
+          id: session.id,
+          createdAt: session.createdAt,
+          participant: location ? location.participant : null,
+          folderName: location ? location.startTime : null,
+          hasData: !!location && fs.existsSync(location.absolutePath),
+        };
+      }),
+    );
+  } catch (error) {
+    res.status(500).json({ message: "Error while fetching sessions", error: error.message });
+  }
+});
+
 // study data download endpoint
+// Optional query ?sessions=1,2,3 only zips these sessions, otherwise the whole study is zipped.
 app.get("/api/studies/:id/download", requireAuth, async (req, res) => {
   const { id } = req.params;
 
@@ -272,6 +328,27 @@ app.get("/api/studies/:id/download", requireAuth, async (req, res) => {
       return res.status(404).json({ message: "No data exists for this study yet" });
     }
 
+    // Collect the selected session folders (only sessions of this study, only existing folders)
+    let selectedLocations = null;
+    if (req.query.sessions) {
+      const sessionIds = String(req.query.sessions)
+        .split(",")
+        .map(Number)
+        .filter((sessionId) => Number.isInteger(sessionId));
+
+      const sessions = await prisma.session.findMany({
+        where: { studyId: study.id, id: { in: sessionIds } },
+      });
+
+      selectedLocations = sessions
+        .map((session) => getSessionLocation(studyDir, session))
+        .filter((location) => location && fs.existsSync(location.absolutePath));
+
+      if (selectedLocations.length === 0) {
+        return res.status(404).json({ message: "No data exists for the selected sessions" });
+      }
+    }
+
     const safeTitle = study.title.replace(/[^a-z0-9]+/gi, "_");
     res.attachment(`study-${study.id}-${safeTitle}.zip`);
 
@@ -282,7 +359,14 @@ app.get("/api/studies/:id/download", requireAuth, async (req, res) => {
     });
 
     archive.pipe(res);
-    archive.directory(studyDir, false);
+    if (selectedLocations) {
+      // keep the participant/startTime folder structure inside the zip
+      selectedLocations.forEach((location) => {
+        archive.directory(location.absolutePath, location.relativePath);
+      });
+    } else {
+      archive.directory(studyDir, false);
+    }
     archive.finalize();
   } catch (error) {
     res.status(500).json({ message: "Error while downloading study data", error: error.message });

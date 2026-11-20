@@ -42,6 +42,31 @@ const isDeleting = ref(false);
 const studyToDelete = ref<Study | null>(null);
 const deleteConfirmationTitle = ref("");
 
+// Download Modal State
+interface DownloadSession {
+  id: number;
+  createdAt: string;
+  participant: string | null;
+  folderName: string | null;
+  // false if the session folder does not exist on the server
+  hasData: boolean;
+}
+const isDownloadModalOpen = ref(false);
+const isLoadingSessions = ref(false);
+const isDownloading = ref(false);
+const studyToDownload = ref<Study | null>(null);
+const downloadSessions = ref<DownloadSession[]>([]);
+const selectedSessionIds = ref<number[]>([]);
+
+const downloadableSessions = computed(() =>
+  downloadSessions.value.filter((session) => session.hasData),
+);
+const allSessionsSelected = computed(
+  () =>
+    downloadableSessions.value.length > 0 &&
+    selectedSessionIds.value.length === downloadableSessions.value.length,
+);
+
 // Status for the copy button
 const copiedStudyId = ref<string | null>(null);
 
@@ -323,10 +348,62 @@ const handleCreateUser = async () => {
   }
 };
 
-const handleDownloadStudyData = async (studyId: string) => {
+const openDownloadModal = async (study: Study) => {
+  studyToDownload.value = study;
+  selectedSessionIds.value = [];
+  downloadSessions.value = [];
+  isDownloadModalOpen.value = true;
+
+  isLoadingSessions.value = true;
   try {
     const response = await fetch(
-      `${URLs.API_URL}/studies/${studyId}/download`,
+      `${URLs.API_URL}/studies/${study.id}/sessions`,
+      { headers: authHeaders() },
+    );
+    if (response.ok) {
+      downloadSessions.value = await response.json();
+    } else {
+      showError("Error", "Sessions could not be loaded.");
+    }
+  } catch (error) {
+    showError("Connection Error", "Server is not reachable.");
+  } finally {
+    isLoadingSessions.value = false;
+  }
+};
+
+const closeDownloadModal = () => {
+  isDownloadModalOpen.value = false;
+  studyToDownload.value = null;
+  selectedSessionIds.value = [];
+};
+
+const toggleSelectAllSessions = () => {
+  selectedSessionIds.value = allSessionsSelected.value
+    ? []
+    : downloadableSessions.value.map((session) => session.id);
+};
+
+// e.g. "28.08.2026, 12:44"
+const formatSessionDate = (value: string) =>
+  new Date(value).toLocaleString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+// Without sessionIds the whole study is downloaded
+const handleDownloadStudyData = async (
+  studyId: string,
+  sessionIds?: number[],
+) => {
+  const query = sessionIds?.length ? `?sessions=${sessionIds.join(",")}` : "";
+  isDownloading.value = true;
+  try {
+    const response = await fetch(
+      `${URLs.API_URL}/studies/${studyId}/download${query}`,
       { headers: authHeaders() },
     );
 
@@ -344,11 +421,15 @@ const handleDownloadStudyData = async (studyId: string) => {
     const downloadUrl = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = downloadUrl;
-    link.download = `study-${studyId}.zip`;
+    link.download = sessionIds?.length
+      ? `study-${studyId}-sessions.zip`
+      : `study-${studyId}.zip`;
     link.click();
     window.URL.revokeObjectURL(downloadUrl);
   } catch (error) {
     showError("Connection Error", "Server is not reachable.");
+  } finally {
+    isDownloading.value = false;
   }
 };
 
@@ -483,7 +564,7 @@ onMounted(() => {
                 icon
                 :width="40"
                 :height="40"
-                @click="handleDownloadStudyData(study.id)"
+                @click="openDownloadModal(study)"
               >
                 <PhDownloadSimple :size="18" />
               </VBtn>
@@ -689,6 +770,103 @@ onMounted(() => {
           @click="handleCreateUser"
         >
           Create new user
+        </VBtn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Modal: Download Study Data -->
+  <v-dialog v-model="isDownloadModalOpen" max-width="560px" persistent>
+    <v-card style="padding: 24px; border-radius: 12px;">
+      <v-card-title class="px-0 pt-0 mb-1" style="font-weight: 600;">
+        Download Data
+      </v-card-title>
+      <p class="mb-2" style="font-size: 14px; color: #737373;">
+        {{ studyToDownload?.title }} &middot; Select the sessions you want to download.
+      </p>
+
+      <v-card-text class="px-0 py-2">
+        <div v-if="isLoadingSessions" class="text-center py-4">
+          <v-progress-circular indeterminate color="#00594C"></v-progress-circular>
+        </div>
+
+        <div
+          v-else-if="downloadSessions.length === 0"
+          class="text-center py-6"
+          style="color: #737373; font-weight: 500;"
+        >
+          No sessions recorded for this study yet.
+        </div>
+
+        <template v-else>
+          <v-checkbox
+            :model-value="allSessionsSelected"
+            :indeterminate="selectedSessionIds.length > 0 && !allSessionsSelected"
+            :disabled="downloadableSessions.length === 0"
+            label="Select all"
+            color="#00594C"
+            density="compact"
+            hide-details
+            class="mb-1"
+            @update:model-value="toggleSelectAllSessions"
+          ></v-checkbox>
+
+          <div style="max-height: 300px; overflow-y: auto;">
+            <div
+              v-for="session in downloadSessions"
+              :key="session.id"
+              class="d-flex align-center py-1 px-3 mb-2"
+              style="border: 1px solid #e2e8f0; border-radius: 8px;"
+            >
+              <v-checkbox
+                v-model="selectedSessionIds"
+                :value="session.id"
+                :disabled="!session.hasData"
+                color="#00594C"
+                density="compact"
+                hide-details
+                class="flex-grow-0"
+              ></v-checkbox>
+              <div class="ml-2" style="min-width: 0;">
+                <div style="font-weight: 500; color: #2c3e50;">
+                  {{ session.participant ?? "Unknown participant" }}
+                </div>
+                <div style="font-size: 12px; color: #939393;">
+                  {{ formatSessionDate(session.createdAt) }} &middot; ID: {{ session.id }}
+                  <span v-if="!session.hasData" style="color: #c62828;">
+                    &middot; No data on server
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </v-card-text>
+
+      <v-card-actions class="px-0 pb-0 mt-4" style="justify-content: end; gap: 8px;">
+        <VBtn variant="text" color="#737373" @click="closeDownloadModal">
+          Back
+        </VBtn>
+        <VBtn
+          variant="tonal"
+          color="#00594C"
+          :disabled="downloadableSessions.length === 0 || isDownloading"
+          @click="studyToDownload && handleDownloadStudyData(studyToDownload.id)"
+        >
+          Download all
+        </VBtn>
+        <VBtn
+          color="#00594C"
+          style="background-color: #00594C; color: white;"
+          :prepend-icon="PhDownloadSimple"
+          :disabled="selectedSessionIds.length === 0"
+          :loading="isDownloading"
+          @click="
+            studyToDownload &&
+              handleDownloadStudyData(studyToDownload.id, selectedSessionIds)
+          "
+        >
+          Download selected ({{ selectedSessionIds.length }})
         </VBtn>
       </v-card-actions>
     </v-card>

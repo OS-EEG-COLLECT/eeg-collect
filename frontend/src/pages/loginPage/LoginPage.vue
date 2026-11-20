@@ -145,7 +145,7 @@ const handleLogin = async () => {
         max-width: 600px;
       "
     >
-      Access only for authorized test administrators and researchers. <br />
+      Access only for authorized administrators and researchers. <br />
       Participants do not need to log in and use their assigned link.
     </p>
   </BasePage>
