@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { useRouter } from "vue-router";
-import BasePage from "@/components/BasePage.vue";
 import { URL_PARAMS, URLs, getEncodedPassphrase } from "@/utils/helpers";
+import { useToast } from "@/utils/toast";
+import ResearcherHeader from "@/components/ResearcherHeader.vue";
 import {
   PhPlus,
   PhCopy,
@@ -10,11 +10,7 @@ import {
   PhFolder,
   PhWarningCircle,
   PhTrash,
-  PhUsers,
   PhDownloadSimple,
-  PhSignOut,
-  PhEye,
-  PhEyeSlash,
 } from "@phosphor-icons/vue";
 
 // ---- TYPES ----
@@ -22,7 +18,9 @@ interface Study {
   id: string;
   title: string;
   description?: string;
-  createdAt: string;
+  createdAt?: string;
+  // date of the newest session, null if the study has no sessions
+  lastSessionAt?: string | null;
   _count?: { sessions: number };
 }
 
@@ -78,63 +76,14 @@ const errorModal = ref({
 
 // User information from localStorage
 const userId = localStorage.getItem("user_id");
-const isAdmin = localStorage.getItem("is_admin") === "true";
 
 const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("user_token")}`,
 });
 
-// User Management Modal State
-interface ManagedUser {
-  id: number;
-  username: string | null;
-  isAdmin: boolean;
-}
-const isUsersModalOpen = ref(false);
-const isLoadingUsers = ref(false);
-const users = ref<ManagedUser[]>([]);
-
-// Create User form State
-const isCreatingUser = ref(false);
-const newUsername = ref("");
-const newUserPassword = ref("");
-// Second password field, to catch typos
-const newUserPasswordConfirm = ref("");
-// Eye button: shows both password fields as plain text
-const showNewUserPasswords = ref(false);
-const newUserIsAdmin = ref(false);
-
-// Only show the mismatch message once something was typed into the second field
-const newUserPasswordsMismatch = computed(
-  () =>
-    newUserPasswordConfirm.value.length > 0 &&
-    newUserPasswordConfirm.value !== newUserPassword.value,
-);
-
-const canCreateUser = computed(
-  () =>
-    newUsername.value.trim().length > 0 &&
-    newUserPassword.value.trim().length > 0 &&
-    newUserPasswordConfirm.value === newUserPassword.value,
-);
-
-// Delete User Modal State
-const isDeleteUserModalOpen = ref(false);
-const isDeletingUser = ref(false);
-const userToDelete = ref<ManagedUser | null>(null);
-const deleteConfirmationUsername = ref("");
-
-const router = useRouter();
+const { showToast, showErrorToast } = useToast();
 
 // ---- METHODS ----
-
-const handleLogout = () => {
-  localStorage.removeItem("user_token");
-  localStorage.removeItem("user_id");
-  localStorage.removeItem("username");
-  localStorage.removeItem("is_admin");
-  router.push("/login");
-};
 
 const fetchStudies = async () => {
   if (!userId) return;
@@ -215,136 +164,14 @@ const handleDeleteStudy = async () => {
         (study) => study.id !== studyToDelete.value!.id,
       );
       closeDeleteModal();
+      showToast("Study deleted");
     } else {
-      showError("Error", "Study could not be deleted.");
+      showErrorToast("Couldn't delete study");
     }
   } catch (error) {
-    showError("Connection Error", "Server is not reachable.");
+    showErrorToast("Couldn't delete study: server not reachable");
   } finally {
     isDeleting.value = false;
-  }
-};
-
-const resetCreateUserForm = () => {
-  newUsername.value = "";
-  newUserPassword.value = "";
-  newUserPasswordConfirm.value = "";
-  showNewUserPasswords.value = false;
-  newUserIsAdmin.value = false;
-};
-
-const fetchUsers = async () => {
-  isLoadingUsers.value = true;
-  try {
-    const response = await fetch(`${URLs.API_URL}/users/list`, {
-      headers: authHeaders(),
-    });
-    if (response.ok) {
-      users.value = await response.json();
-    } else {
-      showError("Error", "Users could not be loaded.");
-    }
-  } catch (error) {
-    showError("Connection Error", "Server is not reachable.");
-  } finally {
-    isLoadingUsers.value = false;
-  }
-};
-
-const openUsersModal = () => {
-  isUsersModalOpen.value = true;
-  fetchUsers();
-};
-
-const closeUsersModal = () => {
-  isUsersModalOpen.value = false;
-  resetCreateUserForm();
-};
-
-const handleToggleAdmin = async (user: ManagedUser, makeAdmin: boolean) => {
-  try {
-    const response = await fetch(
-      `${URLs.API_URL}/users/${user.id}/admin`,
-      {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ isAdmin: makeAdmin }),
-      },
-    );
-
-    if (response.ok) {
-      user.isAdmin = makeAdmin;
-    } else {
-      const data = await response.json().catch(() => null);
-      showError("Error", data?.message || "Admin rights could not be changed.");
-    }
-  } catch (error) {
-    showError("Connection Error", "Server is not reachable.");
-  }
-};
-
-const openDeleteUserModal = (user: ManagedUser) => {
-  userToDelete.value = user;
-  isDeleteUserModalOpen.value = true;
-};
-
-const closeDeleteUserModal = () => {
-  isDeleteUserModalOpen.value = false;
-  userToDelete.value = null;
-  deleteConfirmationUsername.value = "";
-};
-
-const handleDeleteUser = async () => {
-  if (!userToDelete.value) return;
-  if (deleteConfirmationUsername.value !== userToDelete.value.username) return;
-
-  isDeletingUser.value = true;
-  try {
-    const response = await fetch(
-      `${URLs.API_URL}/users/${userToDelete.value.id}/delete`,
-      { method: "DELETE", headers: authHeaders() },
-    );
-
-    if (response.ok) {
-      users.value = users.value.filter((u) => u.id !== userToDelete.value!.id);
-      closeDeleteUserModal();
-    } else {
-      const data = await response.json().catch(() => null);
-      showError("Error", data?.message || "User could not be deleted.");
-    }
-  } catch (error) {
-    showError("Connection Error", "Server is not reachable.");
-  } finally {
-    isDeletingUser.value = false;
-  }
-};
-
-const handleCreateUser = async () => {
-  if (!canCreateUser.value) return;
-
-  isCreatingUser.value = true;
-  try {
-    const response = await fetch(`${URLs.API_URL}/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeaders() },
-      body: JSON.stringify({
-        username: newUsername.value,
-        password: newUserPassword.value,
-        isAdmin: newUserIsAdmin.value,
-      }),
-    });
-
-    if (response.ok) {
-      resetCreateUserForm();
-      await fetchUsers();
-    } else {
-      const data = await response.json();
-      showError("Error", data.message || "User could not be created.");
-    }
-  } catch (error) {
-    showError("Connection Error", "Server is not reachable.");
-  } finally {
-    isCreatingUser.value = false;
   }
 };
 
@@ -409,10 +236,10 @@ const handleDownloadStudyData = async (
 
     if (!response.ok) {
       const data = await response.json().catch(() => null);
-      const detail = data?.error || data?.message;
-      showError(
-        "Error",
-        `Study data could not be downloaded. (${response.status}${detail ? `: ${detail}` : ""})`,
+      showErrorToast(
+        data?.message
+          ? `Couldn't download data: ${data.message}`
+          : "Couldn't download data",
       );
       return;
     }
@@ -426,8 +253,9 @@ const handleDownloadStudyData = async (
       : `study-${studyId}.zip`;
     link.click();
     window.URL.revokeObjectURL(downloadUrl);
+    showToast("Download started");
   } catch (error) {
-    showError("Connection Error", "Server is not reachable.");
+    showErrorToast("Couldn't download data: server not reachable");
   } finally {
     isDownloading.value = false;
   }
@@ -442,16 +270,74 @@ const handleCopySessionLink = (studyId: string) => {
   });
   const sessionUrl = `${baseUrl}/optimize-signal?${params.toString()}`;
 
-  navigator.clipboard.writeText(sessionUrl).then(() => {
-    copiedStudyId.value = studyId;
-    setTimeout(() => {
-      copiedStudyId.value = null;
-    }, 2000);
-  });
+  // navigator.clipboard only exists on https or localhost
+  if (!navigator.clipboard) {
+    showErrorToast("Couldn't copy link");
+    return;
+  }
+
+  navigator.clipboard
+    .writeText(sessionUrl)
+    .then(() => {
+      copiedStudyId.value = studyId;
+      showToast("Participant link copied");
+      setTimeout(() => {
+        copiedStudyId.value = null;
+      }, 2000);
+    })
+    .catch(() => {
+      showErrorToast("Couldn't copy link");
+    });
 };
 
 const showError = (title: string, message: string) => {
   errorModal.value = { isOpen: true, title, message };
+};
+
+// ---- STUDY CARD META LINE ----
+
+const pluralize = (count: number, word: string) =>
+  `${count} ${count === 1 ? word : `${word}s`}`;
+
+// "just now", "5 minutes ago", "2 days ago", ...
+const formatRelativeTime = (value: string) => {
+  const seconds = Math.max(0, (Date.now() - new Date(value).getTime()) / 1000);
+  const units: [string, number][] = [
+    ["year", 365 * 24 * 3600],
+    ["month", 30 * 24 * 3600],
+    ["week", 7 * 24 * 3600],
+    ["day", 24 * 3600],
+    ["hour", 3600],
+    ["minute", 60],
+  ];
+  for (const [unit, unitSeconds] of units) {
+    const amount = Math.floor(seconds / unitSeconds);
+    if (amount >= 1) return `${pluralize(amount, unit)} ago`;
+  }
+  return "just now";
+};
+
+// e.g. "12 Nov 2026"
+const formatShortDate = (value: string) =>
+  new Date(value).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+// "6 sessions · Last session 2 days ago · Created 12 Nov 2026"
+const getStudyMetaLine = (study: Study) => {
+  const sessionCount = study._count?.sessions ?? 0;
+  const parts = [pluralize(sessionCount, "session")];
+  parts.push(
+    sessionCount > 0 && study.lastSessionAt
+      ? `Last session ${formatRelativeTime(study.lastSessionAt)}`
+      : "No sessions yet",
+  );
+  if (study.createdAt) {
+    parts.push(`Created ${formatShortDate(study.createdAt)}`);
+  }
+  return parts.join(" · ");
 };
 
 onMounted(() => {
@@ -460,45 +346,20 @@ onMounted(() => {
 </script>
 
 <template>
-  <BasePage heading="Researcher Dashboard">
-    <p
-      class="mb-6"
-      style="
-        color: #737373;
-        text-align: center;
-        font-weight: 500;
-        font-size: 18px;
-      "
-    >
-      Manage your studies here and generate links for participants <br />
-      to start new measurement sessions.
-    </p>
+  <div class="dashboard-page">
+    <ResearcherHeader
+      title="Researcher Dashboard"
+      subtitle="Manage your studies and generate links for participants to start new sessions."
+    />
 
-    <div class="dashboard-container">
+    <div class="dashboard-container dashboard-content">
       <!-- Header Action -->
       <div class="d-flex justify-space-between align-center mb-6">
         <h3 style="color: #333; font-weight: 600;">Your Studies</h3>
         <div class="d-flex align-center" style="gap: 8px;">
+          <!-- Only primary (filled) button on this page -->
           <VBtn
-            variant="text"
-            color="#737373"
-            :prepend-icon="PhSignOut"
-            @click="handleLogout"
-          >
-            Logout
-          </VBtn>
-          <VBtn
-            v-if="isAdmin"
-            variant="tonal"
-            color="#00594C"
-            :prepend-icon="PhUsers"
-            @click="openUsersModal"
-          >
-            Manage users
-          </VBtn>
-          <VBtn
-            color="#00594C"
-            style="background-color: #00594C; color: white;"
+            class="btn-primary"
             :prepend-icon="PhPlus"
             @click="isCreateModalOpen = true"
           >
@@ -532,60 +393,76 @@ onMounted(() => {
           class="mb-3 pa-4 study-card"
           variant="outlined"
         >
-          <div class="d-flex justify-space-between align-center">
-            <div>
-              <h4 style="font-size: 18px; color: #2c3e50; margin-bottom: 2px;">
+          <!-- Grid: text on the left, actions always in the same place on the right -->
+          <div class="study-card-row">
+            <div style="min-width: 0;">
+              <!-- Study ID only as a hover tooltip -->
+              <h4
+                style="font-size: 18px; color: #2c3e50; margin-bottom: 2px;"
+                :title="`Study ID: ${study.id}`"
+              >
                 {{ study.title }}
               </h4>
               <p v-if="study.description" style="font-size: 14px; color: #737373; margin-bottom: 4px;">
                 {{ study.description }}
               </p>
-              <span style="font-size: 12px; color: #939393;">
-                ID: {{ study.id }} &middot; {{ study._count?.sessions ?? 0 }}
-                {{ study._count?.sessions === 1 ? 'Session' : 'Sessions' }}
+              <!-- #5f6b76 on white = 5.5:1, meets WCAG AA for small text -->
+              <span style="font-size: 12px; color: #5f6b76;">
+                {{ getStudyMetaLine(study) }}
               </span>
             </div>
 
-            <div class="d-flex align-center" style="gap: 8px;">
+            <div class="study-card-actions">
               <!-- Button: Copy Link -->
               <VBtn
-                variant="tonal"
-                color="#00594C"
+                class="btn-secondary"
+                variant="outlined"
                 :prepend-icon="copiedStudyId === study.id ? PhCheck : PhCopy"
                 @click="handleCopySessionLink(study.id)"
               >
-                {{ copiedStudyId === study.id ? 'Copied!' : 'Session Link' }}
+                {{ copiedStudyId === study.id ? 'Copied!' : 'Copy participant link' }}
               </VBtn>
 
-              <!-- Button: Download Study Data -->
-              <VBtn
-                variant="tonal"
-                color="#00594C"
-                icon
-                :width="40"
-                :height="40"
-                @click="openDownloadModal(study)"
+              <!-- Button: Download Study Data
+                   Disabled buttons get no mouse events, so the tooltip sits on a wrapper span -->
+              <v-tooltip
+                text="No sessions to download yet"
+                location="top"
+                :disabled="(study._count?.sessions ?? 0) > 0"
               >
-                <PhDownloadSimple :size="18" />
-              </VBtn>
+                <template #activator="{ props: tooltipProps }">
+                  <span
+                    v-bind="tooltipProps"
+                    :class="{ 'btn-disabled-wrapper': (study._count?.sessions ?? 0) === 0 }"
+                  >
+                    <VBtn
+                      class="btn-secondary"
+                      variant="outlined"
+                      :prepend-icon="PhDownloadSimple"
+                      :disabled="(study._count?.sessions ?? 0) === 0"
+                      @click="openDownloadModal(study)"
+                    >
+                      Download data
+                    </VBtn>
+                  </span>
+                </template>
+              </v-tooltip>
 
               <!-- Button: Delete Study -->
               <VBtn
-                variant="tonal"
-                color="red"
-                icon
-                :width="40"
-                :height="40"
+                class="btn-secondary btn-danger"
+                variant="outlined"
+                :prepend-icon="PhTrash"
                 @click="openDeleteModal(study)"
               >
-                <PhTrash :size="18" />
+                Delete
               </VBtn>
             </div>
           </div>
         </v-card>
       </div>
     </div>
-  </BasePage>
+  </div>
 
   <!-- Modal: Create New Study -->
   <v-dialog v-model="isCreateModalOpen" max-width="500px" persistent>
@@ -633,143 +510,6 @@ onMounted(() => {
           @click="handleCreateStudy"
         >
           Create new study
-        </VBtn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
-
-  <!-- Modal: Manage Users -->
-  <v-dialog v-model="isUsersModalOpen" max-width="560px" persistent>
-    <v-card style="padding: 24px; border-radius: 12px;">
-      <v-card-title class="px-0 pt-0 mb-2" style="font-weight: 600;">
-        Manage Users
-      </v-card-title>
-
-      <v-card-text class="px-0 py-2">
-        <div v-if="isLoadingUsers" class="text-center py-4">
-          <v-progress-circular indeterminate color="#00594C"></v-progress-circular>
-        </div>
-
-        <div v-else style="max-height: 260px; overflow-y: auto;" class="mb-4">
-          <div
-            v-for="user in users"
-            :key="user.id"
-            class="d-flex justify-space-between align-center py-2 px-3 mb-2"
-            style="border: 1px solid #e2e8f0; border-radius: 8px;"
-          >
-            <div>
-              <span style="font-weight: 500; color: #2c3e50;">{{ user.username }}</span>
-              <v-chip
-                v-if="String(user.id) === userId"
-                size="x-small"
-                variant="tonal"
-                class="ml-2"
-              >
-                You
-              </v-chip>
-            </div>
-            <div class="d-flex align-center" style="gap: 12px;">
-            <v-switch
-              :model-value="user.isAdmin"
-              label="Admin"
-              color="#00594C"
-              density="compact"
-              hide-details
-              inset
-              :disabled="String(user.id) === userId"
-              @update:model-value="(val: boolean | null) => handleToggleAdmin(user, !!val)"
-            ></v-switch>
-            <VBtn
-              variant="tonal"
-              color="red"
-              icon
-              :width="36"
-              :height="36"
-              :disabled="String(user.id) === userId"
-              @click="openDeleteUserModal(user)"
-            >
-              <PhTrash :size="16" />
-            </VBtn>
-            </div>
-          </div>
-        </div>
-
-        <h4 class="mb-3" style="font-weight: 600; color: #333;">Create new user</h4>
-
-        <v-text-field
-          v-model="newUsername"
-          label="Username *"
-          variant="outlined"
-          density="comfortable"
-          class="mb-4"
-          hide-details="auto"
-        ></v-text-field>
-
-        <!-- Both password fields share one column, so they always have the same width.
-             The eye button sits next to the first field in its own column. -->
-        <div class="d-flex align-start mb-4" style="gap: 8px;">
-          <div class="flex-grow-1" style="min-width: 0;">
-            <v-text-field
-              v-model="newUserPassword"
-              label="Password *"
-              :type="showNewUserPasswords ? 'text' : 'password'"
-              variant="outlined"
-              density="comfortable"
-              class="mb-4"
-              hide-details="auto"
-            ></v-text-field>
-
-            <v-text-field
-              v-model="newUserPasswordConfirm"
-              label="Repeat password *"
-              :type="showNewUserPasswords ? 'text' : 'password'"
-              variant="outlined"
-              density="comfortable"
-              hide-details="auto"
-              :error-messages="newUserPasswordsMismatch ? ['Passwords do not match'] : []"
-              @keyup.enter="handleCreateUser"
-            ></v-text-field>
-          </div>
-
-          <VBtn
-            class="flex-shrink-0"
-            variant="text"
-            color="#737373"
-            icon
-            :width="48"
-            :height="48"
-            :aria-label="showNewUserPasswords ? 'Hide passwords' : 'Show passwords'"
-            @click="showNewUserPasswords = !showNewUserPasswords"
-          >
-            <PhEyeSlash v-if="showNewUserPasswords" :size="20" />
-            <PhEye v-else :size="20" />
-          </VBtn>
-        </div>
-
-        <v-checkbox
-          v-model="newUserIsAdmin"
-          label="Grant admin rights"
-          density="comfortable"
-          hide-details="auto"
-        ></v-checkbox>
-      </v-card-text>
-
-      <v-card-actions class="px-0 pb-0 mt-4" style="justify-content: end;">
-        <VBtn
-          variant="text"
-          color="#737373"
-          @click="closeUsersModal"
-        >
-          Close
-        </VBtn>
-        <VBtn
-          color="#00594C"
-          style="background-color: #00594C; color: white;"
-          :disabled="!canCreateUser"
-          :loading="isCreatingUser"
-          @click="handleCreateUser"
-        >
-          Create new user
         </VBtn>
       </v-card-actions>
     </v-card>
@@ -872,46 +612,6 @@ onMounted(() => {
     </v-card>
   </v-dialog>
 
-  <!-- Modal: Delete User -->
-  <v-dialog v-model="isDeleteUserModalOpen" max-width="500px">
-    <v-card style="padding: 24px; border-radius: 12px;">
-      <v-card-title class="px-0 pt-0 mb-2" style="font-weight: 600;">
-        Delete User
-      </v-card-title>
-
-      <v-card-text class="px-0 py-2">
-        Do you really want to delete the user "{{ userToDelete?.username }}"?
-        All of their studies and sessions will be deleted as well.
-        This action cannot be undone.
-
-        <v-text-field
-          v-model="deleteConfirmationUsername"
-          :label="`Type &quot;${userToDelete?.username}&quot; to confirm`"
-          variant="outlined"
-          density="comfortable"
-          class="mt-4"
-          hide-details="auto"
-          @keyup.enter="handleDeleteUser"
-        ></v-text-field>
-      </v-card-text>
-
-      <v-card-actions class="px-0 pb-0 mt-4" style="justify-content: end;">
-        <VBtn variant="text" color="#737373" @click="closeDeleteUserModal">
-          Cancel
-        </VBtn>
-        <VBtn
-          color="red"
-          style="background-color: #c62828; color: white;"
-          :disabled="deleteConfirmationUsername !== userToDelete?.username"
-          :loading="isDeletingUser"
-          @click="handleDeleteUser"
-        >
-          Delete
-        </VBtn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
-
   <!-- Modal: Delete Study -->
   <v-dialog v-model="isDeleteModalOpen" max-width="500px">
     <v-card style="padding: 24px; border-radius: 12px;">
@@ -977,10 +677,97 @@ onMounted(() => {
 </template>
 
 <style scoped>
+/* ---- Button styles (overview page) ----
+   The global VBtn defaults (vuetify.ts) set a pale background and a light grey
+   border with !important, so these classes override them with real contrast. */
+.btn-primary,
+.btn-secondary {
+  min-width: 0 !important;
+  font-weight: 600;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Primary: filled. White on #00594C = 8.3:1 */
+.btn-primary {
+  background-color: #00594c !important;
+  color: #ffffff !important;
+  border: 1px solid #00594c !important;
+}
+.btn-primary:hover {
+  background-color: #00473d !important;
+}
+
+/* Secondary: outline. #00594C text/border on white = 8.3:1 */
+.btn-secondary {
+  background-color: #ffffff !important;
+  color: #00594c !important;
+  border: 1px solid #00594c !important;
+}
+.btn-secondary:hover {
+  background-color: #e6f0ee !important;
+}
+
+/* Destructive secondary: #b42318 on white = 6.5:1 */
+.btn-danger {
+  color: #b42318 !important;
+  border-color: #b42318 !important;
+}
+.btn-danger:hover {
+  background-color: #fdecea !important;
+}
+
+/* Only really disabled buttons look pale */
+.btn-primary.v-btn--disabled,
+.btn-secondary.v-btn--disabled {
+  opacity: 0.45;
+}
+/* Vuetify sets pointer-events: none on disabled buttons, so the cursor is shown on the wrapper */
+.btn-disabled-wrapper {
+  display: inline-block;
+  cursor: not-allowed;
+}
+
+.dashboard-page {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  background: #fafafc;
+}
+
+.study-card-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+}
+
+.study-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+
+/* Narrow screens: buttons go below the text on every card */
+@media (max-width: 760px) {
+  .study-card-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .study-card-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
 .dashboard-container {
   width: 100%;
-  max-width: 750px;
+  max-width: 1200px;
   margin: 0 auto;
+}
+
+.dashboard-content {
+  padding: 32px;
 }
 
 .study-card {

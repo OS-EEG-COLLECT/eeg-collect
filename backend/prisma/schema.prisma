@@ -25,6 +25,7 @@ model Study {
   title       String    @unique
   description String
   folderPath String?
+  createdAt   DateTime  @default(now())
   userId      Int
   user        User      @relation(fields: [userId], references: [id])
   sessions    Session[]

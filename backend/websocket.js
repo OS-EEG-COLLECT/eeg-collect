@@ -103,6 +103,42 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+const MIN_PASSWORD_LENGTH = 8;
+
+// change own password (any logged-in user, always only for req.authUser)
+app.patch("/api/users/me/password", requireAuth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  try {
+    if (typeof currentPassword !== "string" || currentPassword.length === 0) {
+      return res.status(400).json({ field: "currentPassword", message: "Please enter your current password." });
+    }
+    if (typeof newPassword !== "string" || newPassword.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({
+        field: "newPassword",
+        message: `The new password must be at least ${MIN_PASSWORD_LENGTH} characters long.`,
+      });
+    }
+
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, req.authUser.passwordHash);
+    if (!isCurrentPasswordValid) {
+      return res.status(400).json({ field: "currentPassword", message: "The current password is incorrect." });
+    }
+
+    // same hashing as in /api/register
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const prisma = await getPrismaClient();
+    await prisma.user.update({
+      where: { id: req.authUser.id },
+      data: { passwordHash },
+    });
+
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ message: "Error while changing password", error: error.message });
+  }
+});
+
 // user listing endpoint (admin only)
 app.get("/api/users/list", requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -224,7 +260,23 @@ app.get("/api/studies/list", requireAuth, async (req, res) => {
       orderBy: { id: "desc" },
       include: { _count: { select: { sessions: true } } },
     });
-    res.json(studies);
+
+    // newest session per study, shown as "Last session ..." on the dashboard
+    const lastSessions = await prisma.session.groupBy({
+      by: ["studyId"],
+      where: { studyId: { in: studies.map((study) => study.id) } },
+      _max: { createdAt: true },
+    });
+    const lastSessionByStudy = new Map(
+      lastSessions.map((entry) => [entry.studyId, entry._max.createdAt]),
+    );
+
+    res.json(
+      studies.map((study) => ({
+        ...study,
+        lastSessionAt: lastSessionByStudy.get(study.id) ?? null,
+      })),
+    );
   } catch (error) {
     res.status(500).json({ message: "Error while fetching studies", error: error.message });
   }
