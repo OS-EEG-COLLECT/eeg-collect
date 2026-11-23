@@ -1,4 +1,4 @@
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { isEmpty, throttle } from "lodash";
 import { Store } from "vuex";
 
@@ -29,13 +29,36 @@ import {
 } from "@/utils/openBCISerialTypes";
 import { filter_setup, filter_signal } from "@/utils/fir-filter";
 
+// Registers the tester ID of the link in the backend (or lets the backend create
+// an anonymous one) and returns it. Returns null if the backend is not reachable.
+const requestParticipantTesterId = async (
+  studyId: string,
+  testerId?: string,
+): Promise<string | null> => {
+  try {
+    const response = await fetch(`${URLs.API_URL}/studies/${studyId}/participants`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(testerId ? { testerId } : {}),
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.testerId ?? null;
+  } catch (error) {
+    console.error("Error while requesting tester ID:", error);
+    return null;
+  }
+};
+
 export const useConfigureParticipantId = () => {
   const store = useStore();
   const UrlRoute = useRoute();
+  const router = useRouter();
 
   const participantId = computed(
     () => UrlRoute.query[URL_PARAMS.participantIdParam],
   );
+  const studyId = computed(() => UrlRoute.query[URL_PARAMS.studyIdParam]);
 
   if (store.state.participantId) {
     return;
@@ -43,12 +66,36 @@ export const useConfigureParticipantId = () => {
 
   watch(
     () => participantId.value,
-    () => {
-      participantId.value
-        ? store.commit("setParticipantId", {
-            participantId: `${participantId.value}`,
-          })
-        : store.commit("setParticipantIdModalOpen");
+    async () => {
+      // 1. Tester ID in the URL: use it (and register it for the study)
+      if (participantId.value) {
+        store.commit("setParticipantId", {
+          participantId: `${participantId.value}`,
+        });
+        if (studyId.value) {
+          requestParticipantTesterId(`${studyId.value}`, `${participantId.value}`);
+        }
+        return;
+      }
+
+      // 2. No tester ID: the backend creates "anon-<uuid>". It is written into the URL,
+      //    so a reload keeps the same ID. This watcher then runs again and takes case 1.
+      const generatedId = studyId.value
+        ? await requestParticipantTesterId(`${studyId.value}`)
+        : null;
+
+      if (generatedId) {
+        router.replace({
+          query: {
+            ...UrlRoute.query,
+            [URL_PARAMS.participantIdParam]: generatedId,
+          },
+        });
+        return;
+      }
+
+      // 3. Backend not reachable: ask for the ID manually, as before
+      store.commit("setParticipantIdModalOpen");
     },
     { immediate: true },
   );

@@ -66,7 +66,37 @@ const allSessionsSelected = computed(
 );
 
 // Status for the copy button
-const copiedStudyId = ref<string | null>(null);
+// Participant Link Modal State
+// "generic": link without tester ID, "individual": link with the entered tester ID
+const isLinkModalOpen = ref(false);
+const studyForLink = ref<Study | null>(null);
+const linkType = ref<"generic" | "individual">("generic");
+const linkTesterId = ref("");
+const isLinkCopied = ref(false);
+
+// same rule as in the backend (TESTER_ID_PATTERN in websocket.js)
+const TESTER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+const linkTesterIdError = computed(() =>
+  linkTesterId.value.length > 0 && !TESTER_ID_PATTERN.test(linkTesterId.value)
+    ? "Use up to 64 letters, digits, '-' or '_' (no spaces)."
+    : "",
+);
+
+const canCopyLink = computed(
+  () =>
+    linkType.value === "generic" ||
+    (linkTesterId.value.length > 0 && !linkTesterIdError.value),
+);
+
+const participantLink = computed(() =>
+  studyForLink.value
+    ? buildParticipantLink(
+        studyForLink.value.id,
+        linkType.value === "individual" ? linkTesterId.value : undefined,
+      )
+    : "",
+);
 
 const errorModal = ref({
   isOpen: false,
@@ -261,14 +291,36 @@ const handleDownloadStudyData = async (
   }
 };
 
-const handleCopySessionLink = (studyId: string) => {
+// Without testerId the link has no tester ID: the backend then creates "anon-<uuid>"
+const buildParticipantLink = (studyId: string, testerId?: string) => {
   const baseUrl = window.location.origin;
   const params = new URLSearchParams({
     [URL_PARAMS.passPhrase]: getEncodedPassphrase(),
     [URL_PARAMS.channelConfig]: "E",
     [URL_PARAMS.studyIdParam]: studyId,
   });
-  const sessionUrl = `${baseUrl}/optimize-signal?${params.toString()}`;
+  if (testerId) {
+    params.set(URL_PARAMS.participantIdParam, testerId);
+  }
+  return `${baseUrl}/optimize-signal?${params.toString()}`;
+};
+
+const openLinkModal = (study: Study) => {
+  studyForLink.value = study;
+  linkType.value = "generic";
+  linkTesterId.value = "";
+  isLinkCopied.value = false;
+  isLinkModalOpen.value = true;
+};
+
+const closeLinkModal = () => {
+  isLinkModalOpen.value = false;
+  studyForLink.value = null;
+};
+
+const handleCopyParticipantLink = () => {
+  if (!studyForLink.value || !canCopyLink.value) return;
+  const link = participantLink.value;
 
   // navigator.clipboard only exists on https or localhost
   if (!navigator.clipboard) {
@@ -277,12 +329,12 @@ const handleCopySessionLink = (studyId: string) => {
   }
 
   navigator.clipboard
-    .writeText(sessionUrl)
+    .writeText(link)
     .then(() => {
-      copiedStudyId.value = studyId;
+      isLinkCopied.value = true;
       showToast("Participant link copied");
       setTimeout(() => {
-        copiedStudyId.value = null;
+        isLinkCopied.value = false;
       }, 2000);
     })
     .catch(() => {
@@ -413,14 +465,14 @@ onMounted(() => {
             </div>
 
             <div class="study-card-actions">
-              <!-- Button: Copy Link -->
+              <!-- Button: Copy Link (opens the link dialog) -->
               <VBtn
                 class="btn-secondary"
                 variant="outlined"
-                :prepend-icon="copiedStudyId === study.id ? PhCheck : PhCopy"
-                @click="handleCopySessionLink(study.id)"
+                :prepend-icon="PhCopy"
+                @click="openLinkModal(study)"
               >
-                {{ copiedStudyId === study.id ? 'Copied!' : 'Copy participant link' }}
+                Copy participant link
               </VBtn>
 
               <!-- Button: Download Study Data
@@ -510,6 +562,61 @@ onMounted(() => {
           @click="handleCreateStudy"
         >
           Create new study
+        </VBtn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <!-- Modal: Participant Link (generic or with an individual tester ID) -->
+  <v-dialog v-model="isLinkModalOpen" max-width="520px">
+    <v-card style="padding: 24px; border-radius: 12px;">
+      <v-card-title class="px-0 pt-0 mb-1" style="font-weight: 600;">
+        Copy participant link
+      </v-card-title>
+      <p class="mb-4" style="font-size: 14px; color: #737373;">
+        {{ studyForLink?.title }}
+      </p>
+
+      <v-tabs v-model="linkType" color="#00594C" density="compact" class="mb-4">
+        <v-tab value="generic" style="text-transform: none;">Generic</v-tab>
+        <v-tab value="individual" style="text-transform: none;">Individual</v-tab>
+      </v-tabs>
+
+      <v-card-text class="px-0 py-2">
+        <p v-if="linkType === 'generic'" style="font-size: 14px;">
+          The link contains no tester ID. Each person who opens it gets a new
+          anonymous ID automatically (e.g. <code>anon-…</code>).
+        </p>
+
+        <template v-else>
+          <p class="mb-3" style="font-size: 14px;">
+            The tester ID is added to the link and used for this person's recordings.
+          </p>
+          <v-text-field
+            v-model="linkTesterId"
+            label="Tester ID"
+            placeholder="e.g. P-017"
+            variant="outlined"
+            density="comfortable"
+            hide-details="auto"
+            :error-messages="linkTesterIdError ? [linkTesterIdError] : []"
+            @keyup.enter="handleCopyParticipantLink"
+          ></v-text-field>
+        </template>
+      </v-card-text>
+
+      <v-card-actions class="px-0 pb-0 mt-4" style="justify-content: end; gap: 8px;">
+        <VBtn variant="text" color="#737373" @click="closeLinkModal">
+          Close
+        </VBtn>
+        <VBtn
+          color="#00594C"
+          style="background-color: #00594C; color: white;"
+          :prepend-icon="isLinkCopied ? PhCheck : PhCopy"
+          :disabled="!canCopyLink"
+          @click="handleCopyParticipantLink"
+        >
+          {{ isLinkCopied ? "Copied!" : "Copy link" }}
         </VBtn>
       </v-card-actions>
     </v-card>

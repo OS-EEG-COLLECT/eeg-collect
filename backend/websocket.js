@@ -10,6 +10,7 @@ const { getPrismaClient } = require('./db');
 const jwt = require("jsonwebtoken");
 const bcrypt = require('bcrypt');
 const archiver = require('archiver');
+const crypto = require("crypto");
 
 const port = process.env.PORT || 3000;
 const SECRET_KEY = process.env.JWT_SECRET || "fallback_secret_key"; //maybe change
@@ -201,6 +202,7 @@ app.delete("/api/users/:id/delete", requireAuth, requireAdmin, async (req, res) 
 
     await prisma.$transaction([
       prisma.session.deleteMany({ where: { study: { userId: id } } }),
+      prisma.participant.deleteMany({ where: { study: { userId: id } } }),
       prisma.study.deleteMany({ where: { userId: id } }),
       prisma.user.delete({ where: { id } }),
     ]);
@@ -425,6 +427,50 @@ app.get("/api/studies/:id/download", requireAuth, async (req, res) => {
   }
 });
 
+// Tester IDs end up in folder names and in the websocket path, so only safe characters are allowed
+const TESTER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+// participant link endpoint (public, participants are not logged in)
+// - with testerId: registers the given ID for the study (or reuses it if it already exists)
+// - without testerId: creates a new anonymous ID "anon-<uuid v4>"
+// The frontend writes the returned ID into the URL, so it stays the same after a reload.
+app.post("/api/studies/:id/participants", async (req, res) => {
+  const studyId = Number(req.params.id);
+  const { testerId } = req.body || {};
+
+  try {
+    const prisma = await getPrismaClient();
+
+    const study = await prisma.study.findUnique({ where: { id: studyId } });
+    if (!study) {
+      return res.status(404).json({ message: "Study not found" });
+    }
+
+    if (testerId !== undefined && testerId !== null && testerId !== "") {
+      if (typeof testerId !== "string" || !TESTER_ID_PATTERN.test(testerId)) {
+        return res.status(400).json({
+          message: "Invalid tester ID. Use up to 64 letters, digits, '-' or '_'.",
+        });
+      }
+
+      // UNIQUE(studyId, testerId): the same tester ID is stored only once per study
+      const participant = await prisma.participant.upsert({
+        where: { studyId_testerId: { studyId, testerId } },
+        update: {},
+        create: { studyId, testerId },
+      });
+      return res.json({ testerId: participant.testerId, generated: false });
+    }
+
+    const participant = await prisma.participant.create({
+      data: { studyId, testerId: `anon-${crypto.randomUUID()}` },
+    });
+    res.status(201).json({ testerId: participant.testerId, generated: true });
+  } catch (error) {
+    res.status(500).json({ message: "Error while creating participant", error: error.message });
+  }
+});
+
 // study deletion endpoint
 app.delete("/api/studies/:id/delete", requireAuth, async (req, res) => {
   const { id } = req.params;
@@ -443,6 +489,7 @@ app.delete("/api/studies/:id/delete", requireAuth, async (req, res) => {
 
     await prisma.$transaction([
       prisma.session.deleteMany({ where: { studyId: Number(id) } }),
+      prisma.participant.deleteMany({ where: { studyId: Number(id) } }),
       prisma.study.delete({ where: { id: Number(id) } }),
     ]);
     res.status(204).send();
