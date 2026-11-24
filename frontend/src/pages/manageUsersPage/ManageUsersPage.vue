@@ -9,7 +9,11 @@ import {
 } from "@phosphor-icons/vue";
 import ResearcherHeader from "@/components/ResearcherHeader.vue";
 import { URLs } from "@/utils/helpers";
-import { getAuthHeaders, getCurrentUser } from "@/utils/auth";
+import {
+  MIN_PASSWORD_LENGTH,
+  getAuthHeaders,
+  getCurrentUser,
+} from "@/utils/auth";
 import { useToast } from "@/utils/toast";
 
 // User management (admin only). The backend endpoints check admin rights as well.
@@ -46,10 +50,17 @@ const newUserPasswordsMismatch = computed(
     newUserPasswordConfirm.value !== newUserPassword.value,
 );
 
+// same minimum length as for "change password"; shown once something was typed
+const newUserPasswordTooShort = computed(
+  () =>
+    newUserPassword.value.length > 0 &&
+    newUserPassword.value.length < MIN_PASSWORD_LENGTH,
+);
+
 const canCreateUser = computed(
   () =>
     newUsername.value.trim().length > 0 &&
-    newUserPassword.value.trim().length > 0 &&
+    newUserPassword.value.length >= MIN_PASSWORD_LENGTH &&
     newUserPasswordConfirm.value === newUserPassword.value,
 );
 
@@ -296,7 +307,10 @@ onMounted(() => {
               variant="outlined"
               density="comfortable"
               class="mb-4"
+              :hint="`At least ${MIN_PASSWORD_LENGTH} characters`"
+              persistent-hint
               hide-details="auto"
+              :error-messages="newUserPasswordTooShort ? [`Use at least ${MIN_PASSWORD_LENGTH} characters.`] : []"
             ></v-text-field>
 
             <v-text-field
@@ -380,8 +394,7 @@ onMounted(() => {
           Cancel
         </VBtn>
         <VBtn
-          color="red"
-          style="background-color: #c62828; color: white;"
+          class="btn-confirm-delete"
           :disabled="deleteConfirmationUsername !== userToDelete?.username"
           :loading="isDeletingUser"
           @click="handleDeleteUser"
@@ -462,6 +475,23 @@ onMounted(() => {
 }
 /* own account cannot be deleted: only then the button looks pale */
 .btn-secondary.v-btn--disabled {
+  opacity: 0.45;
+}
+
+/* Delete button in the confirmation dialog: dark red background with dark text
+   (text color like the rest of the page) */
+.btn-confirm-delete {
+  min-width: 0 !important;
+  font-weight: 600;
+  background-color: #c62828 !important;
+  color: #1f2937 !important;
+  border: 1px solid #c62828 !important;
+}
+.btn-confirm-delete:hover {
+  background-color: #d84343 !important;
+}
+/* only while the name is not typed correctly the button is pale */
+.btn-confirm-delete.v-btn--disabled {
   opacity: 0.45;
 }
 </style>

@@ -60,6 +60,9 @@ const requireAuth = (req, res, next) => {
 
 // HTTP REST Endpoints
 
+// minimum password length for new users and for "change password"
+const MIN_PASSWORD_LENGTH = 8;
+
 // Registration endpoint
 app.post("/api/register", async (req, res) => {
   const { username, password, isAdmin } = req.body;
@@ -79,6 +82,13 @@ app.post("/api/register", async (req, res) => {
 
     if (existingUser) {
       return res.status(400).json({ message: "Username already taken" });
+    }
+
+    // same rule as for "change password"
+    if (typeof password !== "string" || password.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({
+        message: `The password must be at least ${MIN_PASSWORD_LENGTH} characters long.`,
+      });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -103,8 +113,6 @@ const requireAdmin = (req, res, next) => {
   }
   next();
 };
-
-const MIN_PASSWORD_LENGTH = 8;
 
 // change own password (any logged-in user, always only for req.authUser)
 app.patch("/api/users/me/password", requireAuth, async (req, res) => {
