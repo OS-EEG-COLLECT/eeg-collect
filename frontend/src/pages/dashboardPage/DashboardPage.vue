@@ -887,17 +887,17 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
-/* Delete button in the confirmation dialog: light red with dark text,
-   so "Delete" is easy to read. #1f2937 on #fdecea = 14:1 */
+/* Delete button in the confirmation dialog: dark red background with dark text
+   (text color like the rest of the page) */
 .btn-confirm-delete {
   min-width: 0 !important;
   font-weight: 600;
-  background-color: #fdecea !important;
+  background-color: #c62828 !important;
   color: #1f2937 !important;
-  border: 1px solid #b42318 !important;
+  border: 1px solid #c62828 !important;
 }
 .btn-confirm-delete:hover {
-  background-color: #f9d3cf !important;
+  background-color: #d84343 !important;
 }
 /* only while the name is not typed correctly the button is pale */
 .btn-confirm-delete.v-btn--disabled {
