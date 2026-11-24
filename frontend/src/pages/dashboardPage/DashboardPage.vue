@@ -750,8 +750,7 @@ onMounted(() => {
           Cancel
         </VBtn>
         <VBtn
-          color="red"
-          style="background-color: #c62828; color: white;"
+          class="btn-confirm-delete"
           :disabled="deleteConfirmationTitle !== studyToDelete?.title"
           :loading="isDeleting"
           @click="handleDeleteStudy"
@@ -886,5 +885,22 @@ onMounted(() => {
 .study-card:hover {
   border-color: #00594C;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* Delete button in the confirmation dialog: light red with dark text,
+   so "Delete" is easy to read. #1f2937 on #fdecea = 14:1 */
+.btn-confirm-delete {
+  min-width: 0 !important;
+  font-weight: 600;
+  background-color: #fdecea !important;
+  color: #1f2937 !important;
+  border: 1px solid #b42318 !important;
+}
+.btn-confirm-delete:hover {
+  background-color: #f9d3cf !important;
+}
+/* only while the name is not typed correctly the button is pale */
+.btn-confirm-delete.v-btn--disabled {
+  opacity: 0.45;
 }
 </style>
