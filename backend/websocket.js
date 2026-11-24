@@ -305,19 +305,38 @@ app.post("/api/studies/create", requireAuth, async (req, res) => {
   }
 });
 
-// Session folders live at recordings/<userId>/<studyId>/<participant>/<startTime>.
-// The path is rebuilt from the last two parts of the stored folderPath, so it still
+// ---- Recording folders ----
+// New recordings:  recordings/researcher-<userId>/study-<studyId>/<participant>/<startTime>
+// Older recordings were saved without prefixes: recordings/<userId>/<studyId>/...
+// Both are still read, so old data stays downloadable.
+const getResearcherFolderName = (userId) => `researcher-${userId}`;
+const getStudyFolderName = (studyId) => `study-${studyId}`;
+
+const getStudyDir = (study) =>
+  path.join(RECORDINGS_DIR, getResearcherFolderName(study.userId), getStudyFolderName(study.id));
+
+const getLegacyStudyDir = (study) =>
+  path.join(RECORDINGS_DIR, `${study.userId}`, `${study.id}`);
+
+// all existing folders of a study (new and/or old naming)
+const getExistingStudyDirs = (study) =>
+  [getStudyDir(study), getLegacyStudyDir(study)].filter((dir) => fs.existsSync(dir));
+
+// The session path is rebuilt from the last two parts of the stored folderPath, so it still
 // works if the recordings folder was moved, and it can never point outside the study.
-const getSessionLocation = (studyDir, session) => {
+// The new folder is preferred, the old one is used if only that exists.
+const getSessionLocation = (study, session) => {
   if (!session.folderPath) return null;
   const startTime = path.basename(session.folderPath);
   const participant = path.basename(path.dirname(session.folderPath));
+  const newPath = path.join(getStudyDir(study), participant, startTime);
+  const legacyPath = path.join(getLegacyStudyDir(study), participant, startTime);
   return {
     participant,
     startTime,
     // zip entries always use forward slashes, also on Windows
     relativePath: `${participant}/${startTime}`,
-    absolutePath: path.join(studyDir, participant, startTime),
+    absolutePath: !fs.existsSync(newPath) && fs.existsSync(legacyPath) ? legacyPath : newPath,
   };
 };
 
@@ -337,7 +356,6 @@ app.get("/api/studies/:id/sessions", requireAuth, async (req, res) => {
       return res.status(403).json({ message: "You do not have access to this study." });
     }
 
-    const studyDir = path.join(RECORDINGS_DIR, `${study.userId}`, `${study.id}`);
     const sessions = await prisma.session.findMany({
       where: { studyId: study.id },
       orderBy: { createdAt: "desc" },
@@ -345,7 +363,7 @@ app.get("/api/studies/:id/sessions", requireAuth, async (req, res) => {
 
     res.json(
       sessions.map((session) => {
-        const location = getSessionLocation(studyDir, session);
+        const location = getSessionLocation(study, session);
         return {
           id: session.id,
           createdAt: session.createdAt,
@@ -377,8 +395,8 @@ app.get("/api/studies/:id/download", requireAuth, async (req, res) => {
       return res.status(403).json({ message: "You do not have access to this study." });
     }
 
-    const studyDir = path.join(RECORDINGS_DIR, `${study.userId}`, `${study.id}`);
-    if (!fs.existsSync(studyDir)) {
+    const studyDirs = getExistingStudyDirs(study);
+    if (studyDirs.length === 0) {
       return res.status(404).json({ message: "No data exists for this study yet" });
     }
 
@@ -395,7 +413,7 @@ app.get("/api/studies/:id/download", requireAuth, async (req, res) => {
       });
 
       selectedLocations = sessions
-        .map((session) => getSessionLocation(studyDir, session))
+        .map((session) => getSessionLocation(study, session))
         .filter((location) => location && fs.existsSync(location.absolutePath));
 
       if (selectedLocations.length === 0) {
@@ -419,7 +437,9 @@ app.get("/api/studies/:id/download", requireAuth, async (req, res) => {
         archive.directory(location.absolutePath, location.relativePath);
       });
     } else {
-      archive.directory(studyDir, false);
+      // new and old folders have the same inner structure (participant/startTime),
+      // so both end up side by side in the zip
+      studyDirs.forEach((dir) => archive.directory(dir, false));
     }
     archive.finalize();
   } catch (error) {
@@ -535,6 +555,14 @@ wss.on("connection", async (ws, req) => {
   const studyId = location.query.studyId;
   console.log(`mode: ${mode} participant: ${participant} studyId: ${studyId}`);
 
+  // The tester ID becomes a folder name, so only safe characters are allowed
+  // (no "..", no slashes) - same rule as for participant links
+  if (!participant || !TESTER_ID_PATTERN.test(participant)) {
+    console.error(`Invalid tester ID in websocket path: ${participant}`);
+    ws.close(1008, "Invalid tester id");
+    return;
+  }
+
   let prisma;
   let study;
   try {
@@ -552,8 +580,9 @@ wss.on("connection", async (ws, req) => {
     return;
   }
 
-  const researcher = `${study.userId}`
-  const studyFolder = `${study.id}`
+  // folder names, e.g. "researcher-3" and "study-12"
+  const researcher = getResearcherFolderName(study.userId);
+  const studyFolder = getStudyFolderName(study.id);
 
   let hasMainRecordingStarted = false;
 
@@ -574,7 +603,8 @@ wss.on("connection", async (ws, req) => {
   }
 
   // let the frontend know where this session's files live, so it can tell
-  // other services (e.g. the CSV-saving Express server) where to write to
+  // other services (e.g. the CSV-saving Express server) where to write to.
+  // researcherId/studyId are the folder names ("researcher-3", "study-12"), not the plain IDs.
   ws.send(JSON.stringify({
     event: "session_folder",
     researcherId: researcher,

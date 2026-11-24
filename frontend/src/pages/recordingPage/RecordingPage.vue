@@ -189,7 +189,7 @@ watch(
       :next-route="ROUTES.FINISH"
       :impedance-check-channel="impedanceCheckChannel"
       :is-impedance-check-running="isImpedanceCheckRunning"
-      :run-impedance-check="runImpedanceCheck"
+      :run-impedance-check="() => runImpedanceCheck('end')"
       :stop-recording="stopRecording"
       :impedance-panel-description="`Resistance measurements for each electrode.<br />The recording will stop after this step.`"
     />

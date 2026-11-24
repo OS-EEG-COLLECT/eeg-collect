@@ -50,6 +50,9 @@ const requestParticipantTesterId = async (
   }
 };
 
+// Impedance check at the start ("start") or at the end ("end") of the session
+export type ImpedancePhase = "start" | "end";
+
 export const useConfigureParticipantId = () => {
   const store = useStore();
   const UrlRoute = useRoute();
@@ -705,7 +708,9 @@ export const useOpenBCIUtils = () => {
     }
   };
 
-  const runImpedanceCheck = async () => {
+  // phase: "start" = check before the recording, "end" = check after the recording.
+  // It only changes the file name of the exported impedance CSV.
+  const runImpedanceCheck = async (phase: ImpedancePhase) => {
     const urlParams = new URLSearchParams(window.location.search);
     const channelConfig = urlParams.get("wlmtdoqtqe");
 
@@ -747,7 +752,7 @@ export const useOpenBCIUtils = () => {
       });
     }
 
-    await exportImpedanceCSV();
+    await exportImpedanceCSV(phase);
   };
 
   const sendAudioSignalStartMessage = async () => {
@@ -1176,7 +1181,7 @@ export const useOpenBCIUtils = () => {
     }
   };
 
-  const exportImpedanceCSV = async () => {
+  const exportImpedanceCSV = async (phase: ImpedancePhase) => {
     const objectKeys = Object.keys(impedanceDataRaw.value);
     const csvContent = parseAndExportImpedance(
       impedanceDataRaw.value,
@@ -1185,7 +1190,13 @@ export const useOpenBCIUtils = () => {
     const startTime = impedanceRecordingStartTime.value
       .replace(" ", "_")
       .replace(/:/g, "-");
-    const fileName = `${participantId.value}-${startTime}-Impedance.csv`;
+    const phaseLabel = phase === "start" ? "Start" : "End";
+    // Inside the session folder: "Impedances-Start.csv" / "Impedances-End.csv"
+    // (like Recording.csv and Setup.csv). Without a session folder all files land
+    // in one flat folder, so participant and time stay in the name there.
+    const fileName = sessionFolder.value
+      ? `Impedances-${phaseLabel}.csv`
+      : `${participantId.value}-${startTime}-Impedances-${phaseLabel}.csv`;
 
     const formData = new FormData();
     formData.append("fileName", fileName);
