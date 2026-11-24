@@ -25,9 +25,22 @@ model Study {
   title       String    @unique
   description String
   folderPath String?
+  createdAt   DateTime  @default(now())
   userId      Int
   user        User      @relation(fields: [userId], references: [id])
   sessions    Session[]
+  participants Participant[]
+}
+
+// Tester IDs used in participant links. A tester ID exists only once per study.
+model Participant {
+  id        Int      @id @default(autoincrement())
+  testerId  String
+  createdAt DateTime @default(now())
+  studyId   Int
+  study     Study    @relation(fields: [studyId], references: [id])
+
+  @@unique([studyId, testerId])
 }
 
 model Session {

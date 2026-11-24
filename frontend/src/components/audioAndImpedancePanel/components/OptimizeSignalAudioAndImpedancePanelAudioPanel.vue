@@ -200,16 +200,20 @@ onUnmounted(() => {
           -webkit-backdrop-filter: blur(10px);
         "
       >
+        <!-- Progress bar is part of the normal layout (not absolutely positioned),
+             so it keeps the same padding as the button and is never cut off.
+             left/transform reset Vuetify's default centering (left: 50%; translateX(-50%)) -->
         <v-progress-linear
           v-if="hasUserReadInstructions"
-          class="mr-auto position-absolute"
-          style="width: 150px; height: 5px; left: 25px; top: 50%"
+          class="flex-grow-0 flex-shrink-0"
+          style="width: 150px; left: 0; transform: none"
+          height="5"
           :model-value="progress"
           rounded
           :color="!isTimerFinished ? '#000000' : '#05775e'"
         />
 
-        <VRow class="align-start justify-center">
+        <VRow class="align-start justify-end flex-grow-0 ms-auto">
           <VBtn
             v-if="!hasUserReadInstructions"
             class="flex-grow-0 flex-shrink-1 d-flex"

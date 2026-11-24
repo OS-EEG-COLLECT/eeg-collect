@@ -10,6 +10,7 @@ const { getPrismaClient } = require('./db');
 const jwt = require("jsonwebtoken");
 const bcrypt = require('bcrypt');
 const archiver = require('archiver');
+const crypto = require("crypto");
 
 const port = process.env.PORT || 3000;
 const SECRET_KEY = process.env.JWT_SECRET || "fallback_secret_key"; //maybe change
@@ -103,6 +104,42 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+const MIN_PASSWORD_LENGTH = 8;
+
+// change own password (any logged-in user, always only for req.authUser)
+app.patch("/api/users/me/password", requireAuth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  try {
+    if (typeof currentPassword !== "string" || currentPassword.length === 0) {
+      return res.status(400).json({ field: "currentPassword", message: "Please enter your current password." });
+    }
+    if (typeof newPassword !== "string" || newPassword.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({
+        field: "newPassword",
+        message: `The new password must be at least ${MIN_PASSWORD_LENGTH} characters long.`,
+      });
+    }
+
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, req.authUser.passwordHash);
+    if (!isCurrentPasswordValid) {
+      return res.status(400).json({ field: "currentPassword", message: "The current password is incorrect." });
+    }
+
+    // same hashing as in /api/register
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const prisma = await getPrismaClient();
+    await prisma.user.update({
+      where: { id: req.authUser.id },
+      data: { passwordHash },
+    });
+
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ message: "Error while changing password", error: error.message });
+  }
+});
+
 // user listing endpoint (admin only)
 app.get("/api/users/list", requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -165,6 +202,7 @@ app.delete("/api/users/:id/delete", requireAuth, requireAdmin, async (req, res) 
 
     await prisma.$transaction([
       prisma.session.deleteMany({ where: { study: { userId: id } } }),
+      prisma.participant.deleteMany({ where: { study: { userId: id } } }),
       prisma.study.deleteMany({ where: { userId: id } }),
       prisma.user.delete({ where: { id } }),
     ]);
@@ -224,7 +262,23 @@ app.get("/api/studies/list", requireAuth, async (req, res) => {
       orderBy: { id: "desc" },
       include: { _count: { select: { sessions: true } } },
     });
-    res.json(studies);
+
+    // newest session per study, shown as "Last session ..." on the dashboard
+    const lastSessions = await prisma.session.groupBy({
+      by: ["studyId"],
+      where: { studyId: { in: studies.map((study) => study.id) } },
+      _max: { createdAt: true },
+    });
+    const lastSessionByStudy = new Map(
+      lastSessions.map((entry) => [entry.studyId, entry._max.createdAt]),
+    );
+
+    res.json(
+      studies.map((study) => ({
+        ...study,
+        lastSessionAt: lastSessionByStudy.get(study.id) ?? null,
+      })),
+    );
   } catch (error) {
     res.status(500).json({ message: "Error while fetching studies", error: error.message });
   }
@@ -251,7 +305,81 @@ app.post("/api/studies/create", requireAuth, async (req, res) => {
   }
 });
 
+// ---- Recording folders ----
+// New recordings:  recordings/researcher-<userId>/study-<studyId>/<participant>/<startTime>
+// Older recordings were saved without prefixes: recordings/<userId>/<studyId>/...
+// Both are still read, so old data stays downloadable.
+const getResearcherFolderName = (userId) => `researcher-${userId}`;
+const getStudyFolderName = (studyId) => `study-${studyId}`;
+
+const getStudyDir = (study) =>
+  path.join(RECORDINGS_DIR, getResearcherFolderName(study.userId), getStudyFolderName(study.id));
+
+const getLegacyStudyDir = (study) =>
+  path.join(RECORDINGS_DIR, `${study.userId}`, `${study.id}`);
+
+// all existing folders of a study (new and/or old naming)
+const getExistingStudyDirs = (study) =>
+  [getStudyDir(study), getLegacyStudyDir(study)].filter((dir) => fs.existsSync(dir));
+
+// The session path is rebuilt from the last two parts of the stored folderPath, so it still
+// works if the recordings folder was moved, and it can never point outside the study.
+// The new folder is preferred, the old one is used if only that exists.
+const getSessionLocation = (study, session) => {
+  if (!session.folderPath) return null;
+  const startTime = path.basename(session.folderPath);
+  const participant = path.basename(path.dirname(session.folderPath));
+  const newPath = path.join(getStudyDir(study), participant, startTime);
+  const legacyPath = path.join(getLegacyStudyDir(study), participant, startTime);
+  return {
+    participant,
+    startTime,
+    // zip entries always use forward slashes, also on Windows
+    relativePath: `${participant}/${startTime}`,
+    absolutePath: !fs.existsSync(newPath) && fs.existsSync(legacyPath) ? legacyPath : newPath,
+  };
+};
+
+// study session listing endpoint (used by the download dialog)
+app.get("/api/studies/:id/sessions", requireAuth, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const prisma = await getPrismaClient();
+
+    const study = await prisma.study.findUnique({ where: { id: Number(id) } });
+    if (!study) {
+      return res.status(404).json({ message: "Study not found" });
+    }
+
+    if (study.userId !== req.authUser.id) {
+      return res.status(403).json({ message: "You do not have access to this study." });
+    }
+
+    const sessions = await prisma.session.findMany({
+      where: { studyId: study.id },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json(
+      sessions.map((session) => {
+        const location = getSessionLocation(study, session);
+        return {
+          id: session.id,
+          createdAt: session.createdAt,
+          participant: location ? location.participant : null,
+          folderName: location ? location.startTime : null,
+          hasData: !!location && fs.existsSync(location.absolutePath),
+        };
+      }),
+    );
+  } catch (error) {
+    res.status(500).json({ message: "Error while fetching sessions", error: error.message });
+  }
+});
+
 // study data download endpoint
+// Optional query ?sessions=1,2,3 only zips these sessions, otherwise the whole study is zipped.
 app.get("/api/studies/:id/download", requireAuth, async (req, res) => {
   const { id } = req.params;
 
@@ -267,9 +395,30 @@ app.get("/api/studies/:id/download", requireAuth, async (req, res) => {
       return res.status(403).json({ message: "You do not have access to this study." });
     }
 
-    const studyDir = path.join(RECORDINGS_DIR, `${study.userId}`, `${study.id}`);
-    if (!fs.existsSync(studyDir)) {
+    const studyDirs = getExistingStudyDirs(study);
+    if (studyDirs.length === 0) {
       return res.status(404).json({ message: "No data exists for this study yet" });
+    }
+
+    // Collect the selected session folders (only sessions of this study, only existing folders)
+    let selectedLocations = null;
+    if (req.query.sessions) {
+      const sessionIds = String(req.query.sessions)
+        .split(",")
+        .map(Number)
+        .filter((sessionId) => Number.isInteger(sessionId));
+
+      const sessions = await prisma.session.findMany({
+        where: { studyId: study.id, id: { in: sessionIds } },
+      });
+
+      selectedLocations = sessions
+        .map((session) => getSessionLocation(study, session))
+        .filter((location) => location && fs.existsSync(location.absolutePath));
+
+      if (selectedLocations.length === 0) {
+        return res.status(404).json({ message: "No data exists for the selected sessions" });
+      }
     }
 
     const safeTitle = study.title.replace(/[^a-z0-9]+/gi, "_");
@@ -282,10 +431,63 @@ app.get("/api/studies/:id/download", requireAuth, async (req, res) => {
     });
 
     archive.pipe(res);
-    archive.directory(studyDir, false);
+    if (selectedLocations) {
+      // keep the participant/startTime folder structure inside the zip
+      selectedLocations.forEach((location) => {
+        archive.directory(location.absolutePath, location.relativePath);
+      });
+    } else {
+      // new and old folders have the same inner structure (participant/startTime),
+      // so both end up side by side in the zip
+      studyDirs.forEach((dir) => archive.directory(dir, false));
+    }
     archive.finalize();
   } catch (error) {
     res.status(500).json({ message: "Error while downloading study data", error: error.message });
+  }
+});
+
+// Tester IDs end up in folder names and in the websocket path, so only safe characters are allowed
+const TESTER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+// participant link endpoint (public, participants are not logged in)
+// - with testerId: registers the given ID for the study (or reuses it if it already exists)
+// - without testerId: creates a new anonymous ID "anon-<uuid v4>"
+// The frontend writes the returned ID into the URL, so it stays the same after a reload.
+app.post("/api/studies/:id/participants", async (req, res) => {
+  const studyId = Number(req.params.id);
+  const { testerId } = req.body || {};
+
+  try {
+    const prisma = await getPrismaClient();
+
+    const study = await prisma.study.findUnique({ where: { id: studyId } });
+    if (!study) {
+      return res.status(404).json({ message: "Study not found" });
+    }
+
+    if (testerId !== undefined && testerId !== null && testerId !== "") {
+      if (typeof testerId !== "string" || !TESTER_ID_PATTERN.test(testerId)) {
+        return res.status(400).json({
+          message: "Invalid tester ID. Use up to 64 letters, digits, '-' or '_'.",
+        });
+      }
+
+      // UNIQUE(studyId, testerId): the same tester ID is stored only once per study
+      const participant = await prisma.participant.upsert({
+        where: { studyId_testerId: { studyId, testerId } },
+        update: {},
+        create: { studyId, testerId },
+      });
+      return res.json({ testerId: participant.testerId, generated: false });
+    }
+
+    const participant = await prisma.participant.create({
+      data: { studyId, testerId: `anon-${crypto.randomUUID()}` },
+    });
+    res.status(201).json({ testerId: participant.testerId, generated: true });
+  } catch (error) {
+    res.status(500).json({ message: "Error while creating participant", error: error.message });
   }
 });
 
@@ -307,6 +509,7 @@ app.delete("/api/studies/:id/delete", requireAuth, async (req, res) => {
 
     await prisma.$transaction([
       prisma.session.deleteMany({ where: { studyId: Number(id) } }),
+      prisma.participant.deleteMany({ where: { studyId: Number(id) } }),
       prisma.study.delete({ where: { id: Number(id) } }),
     ]);
     res.status(204).send();
@@ -352,6 +555,14 @@ wss.on("connection", async (ws, req) => {
   const studyId = location.query.studyId;
   console.log(`mode: ${mode} participant: ${participant} studyId: ${studyId}`);
 
+  // The tester ID becomes a folder name, so only safe characters are allowed
+  // (no "..", no slashes) - same rule as for participant links
+  if (!participant || !TESTER_ID_PATTERN.test(participant)) {
+    console.error(`Invalid tester ID in websocket path: ${participant}`);
+    ws.close(1008, "Invalid tester id");
+    return;
+  }
+
   let prisma;
   let study;
   try {
@@ -369,8 +580,9 @@ wss.on("connection", async (ws, req) => {
     return;
   }
 
-  const researcher = `${study.userId}`
-  const studyFolder = `${study.id}`
+  // folder names, e.g. "researcher-3" and "study-12"
+  const researcher = getResearcherFolderName(study.userId);
+  const studyFolder = getStudyFolderName(study.id);
 
   let hasMainRecordingStarted = false;
 
@@ -391,7 +603,8 @@ wss.on("connection", async (ws, req) => {
   }
 
   // let the frontend know where this session's files live, so it can tell
-  // other services (e.g. the CSV-saving Express server) where to write to
+  // other services (e.g. the CSV-saving Express server) where to write to.
+  // researcherId/studyId are the folder names ("researcher-3", "study-12"), not the plain IDs.
   ws.send(JSON.stringify({
     event: "session_folder",
     researcherId: researcher,

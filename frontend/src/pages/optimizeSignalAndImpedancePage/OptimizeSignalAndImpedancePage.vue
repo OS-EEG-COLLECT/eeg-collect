@@ -396,7 +396,7 @@ const handleRedirectToRecording = async () => {
     :is-setup="true"
     :impedance-check-channel="impedanceCheckChannel"
     :is-impedance-check-running="isImpedanceCheckRunning"
-    :run-impedance-check="runImpedanceCheck"
+    :run-impedance-check="() => runImpedanceCheck('start')"
     :stop-recording="stopRecording"
     :next-route="ROUTES.RECORDING"
     :impedance-panel-description="`Resistance measurements for each electrode.<br />You will be able to start your session after this step.`"

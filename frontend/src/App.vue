@@ -4,6 +4,7 @@ import { onMounted, ref } from "vue";
 import LogoIcon from "@/assets/LogoIcon.vue";
 import { getIsPassphraseValid } from "@/utils/helpers";
 import ParticipantIdModal from "@/components/ParticipantIdModal.vue";
+import AppToast from "@/components/AppToast.vue";
 
 // ---- STATE ----
 const isPassphraseValid = ref(false);
@@ -36,6 +37,7 @@ onMounted(async () => {
 
     <!-- ---- Global Modals ---- -->
     <ParticipantIdModal />
+    <AppToast />
   </div>
 </template>
 

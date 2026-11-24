@@ -8,6 +8,7 @@ import {
 
 import LoginPage from "@/pages/loginPage/LoginPage.vue";
 import DashboardPage from "@/pages/dashboardPage/DashboardPage.vue";
+import ManageUsersPage from "@/pages/manageUsersPage/ManageUsersPage.vue";
 import SetupDevicePage from "@/pages/setupDevicePage/SetupDevicePage.vue";
 import OptimizeSignalAndImpedancePage from "@/pages/optimizeSignalAndImpedancePage/OptimizeSignalAndImpedancePage.vue";
 import RecordingPage from "@/pages/recordingPage/RecordingPage.vue";
@@ -31,6 +32,12 @@ const routes = [
     path: "/dashboard",
     component: DashboardPage,
     meta: { requiresAuth: true},
+  },
+  {
+    // the backend checks admin rights too, this only keeps non-admins off the page
+    path: "/users",
+    component: ManageUsersPage,
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   // Part 2 for sessions of a study
   {
@@ -63,6 +70,12 @@ router.beforeEach((to, from, next) => {
 
   if (to.meta.requiresAuth && !isAuthenticated) {
     next({path: "/login"});
+
+    return;
+  }
+
+  if (to.meta.requiresAdmin && localStorage.getItem("is_admin") !== "true") {
+    next({ path: "/dashboard" });
 
     return;
   }
